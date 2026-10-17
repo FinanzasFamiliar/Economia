@@ -105,6 +105,7 @@ async function load(){
   movs=await all("family_movs");
   const c=await sb.from("family_config").select("valores").eq("id",1).maybeSingle();
   if(c.data&&c.data.valores)cfg={...cfg,...c.data.valores};
+  movs=movs.filter(x=>String(x.fecha).slice(0,10)>=D0());
   // ajustes de la barbería (para repartir igual que ella)
   let cb={};try{const a=await sb.from("ajustes").select("valor").eq("clave","config").limit(1);if(a.data&&a.data.length)cb=a.data[0].valor||{};else{const l=localStorage.getItem("monos_config");if(l)cb=JSON.parse(l)}}catch(e){}
   CB=cb;
@@ -203,7 +204,7 @@ function calc(mp){
  const m=mp||$("mes").value||today().slice(0,7),now=today(),[y,mo]=m.split("-").map(Number),dim=new Date(y,mo,0).getDate();
  const day=now.slice(0,7)===m?+now.slice(8):(m<now.slice(0,7)?dim:0);
  const mm=movs.filter(x=>String(x.fecha).slice(0,7)===m),gs=mm.filter(x=>x.tipo==="gasto");
- const nm=m>=B.start.slice(0,7)?netMonth(m):{libre:0,days:{}};
+ const nm=netFrom(m);
  const ingMan=ofTipo(mm,"ingreso"),ingreso=nm.libre+ingMan,gasto=ofTipo(mm,"gasto");
  const fijos=sum(fijosOf(m).map(x=>num(x.a))),fijoPag=sum(gs.filter(x=>fijasC().includes(x.categoria)).map(x=>num(x.monto)));
  const fijoPend=Math.max(0,fijos-fijoPag);
@@ -318,6 +319,8 @@ function pAse(c){
 }
 const PR=[["vital","Vital"],["fecha","Con fecha"],["gusto","Gusto"]];
 const crow=(n,f,g,p,b)=>g?'<div class="crow g"><input class="cn" style="grid-column:span 2" value="'+esc(n)+'" placeholder="Nombre"><button class="chip" data-fx>×</button><select class="cp">'+PR.map(x=>'<option value="'+x[0]+'"'+((p||(f?"fecha":"gusto"))===x[0]?" selected":"")+'>'+x[1]+'</option>').join("")+'</select><input class="cb" type="number" inputmode="decimal" placeholder="Monto/mes" value="'+(num(b)||"")+'"><label><input type="checkbox" class="cf"'+(f?" checked":"")+'> fijo</label></div>':'<div class="crow"><input class="cn" value="'+esc(n)+'" placeholder="Nombre"><span></span><button class="chip" data-fx>×</button></div>';
+const D0=()=>cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde:B.start;
+function netFrom(m){if(m<B.start.slice(0,7))return{libre:0,days:{}};const nm=netMonth(m),d0=D0();if(d0<=m+"-01")return nm;const days={};let L=0;Object.keys(nm.days).forEach(k=>{if(k>=d0){days[k]=nm.days[k];L+=nm.days[k]}});return{libre:L,days}}
 const wkS=d=>{const x=parseD(d);x.setDate(x.getDate()-x.getDay());return fmt(x)};
 function cartera(){const d0=cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde:B.start,cur=today().slice(0,7);let y=+d0.slice(0,4),mo=+d0.slice(5,7),s=num(cfg.cartera0);
  for(let i=0;i<120;i++){const k=y+"-"+String(mo).padStart(2,"0");if(k>cur)break;const dd=netMonth(k).days;Object.keys(dd).forEach(d=>{if(d>=d0)s+=dd[d]});mo++;if(mo>12){mo=1;y++}}
