@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Finanzas del Hogar</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14213d;--mut:#6b7280;--line:#e5e7eb;--ok:#16a34a;--bad:#dc2626;--save:#2563eb;--warn:#d97706}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171e2e;--ink:#eef1f7;--mut:#9aa4b8;--line:#263047}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:78px}
+.hidden{display:none!important}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;z-index:5}
+.hr{max-width:760px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:19px;margin:0;font-weight:700}
+main{max-width:760px;margin:auto;padding:16px}
+input,select,button{font:inherit;color:inherit}
+input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+button{cursor:pointer}
+.btn{width:100%;padding:13px;border:0;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:600}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 12px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.k{color:var(--mut);font-size:13px}.v{font-size:26px;font-weight:700;line-height:1.2}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.save{color:var(--save)}.warn{color:var(--warn)}
+h2{font-size:16px;margin:0 0 4px}
+.box{height:230px;position:relative}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.sub{color:var(--mut);font-size:13px}
+.f{margin-bottom:12px}.f label{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(env(safe-area-inset-bottom) + 6px)}
+nav button{flex:1;border:0;background:none;color:var(--mut);font-size:12.5px;padding:8px 2px}
+nav button.on{color:var(--ink);font-weight:700;border-top:2px solid var(--ink)}
+.verdict{border-left:5px solid var(--mut);padding:12px 14px;border-radius:8px;background:var(--bg);margin-top:12px}
+.tip{padding:10px 0;border-bottom:1px solid var(--line)}.tip:last-child{border:0}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--save)}
+#login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}
+#login div.b{width:100%;max-width:360px}
+</style></head><body>
+
+<section id="login"><div class="b">
+<h1 style="font-size:28px">Finanzas del Hogar</h1><p class="sub">Entra con tu correo y contraseña.</p>
+<div class="f"><label>Correo</label><input id="em" type="email" autocomplete="username"></div>
+<div class="f"><label>Contraseña</label><input id="pw" type="password" autocomplete="current-password"></div>
+<button class="btn" id="go">Entrar</button><p id="lm" class="bad"></p>
+</div></section>
+
+<section id="app" class="hidden">
+<header><div class="hr"><h1>Finanzas del Hogar</h1>
+<div style="display:flex;gap:6px"><input type="month" id="mes" style="width:auto;padding:7px"><button class="chip" id="out">Salir</button></div></div></header>
+<main>
+<div id="p-res"></div><div id="p-mov" class="hidden"></div><div id="p-ase" class="hidden"></div><div id="p-aju" class="hidden"></div>
+</main>
+<nav id="nav"><button data-t="res" class="on">Resumen</button><button data-t="mov">Movimientos</button><button data-t="ase">Asesor</button><button data-t="aju">Ajustes</button></nav>
+</section>
+
+<script>
+/* ===== CONFIGURACIÓN: pega aquí los datos de tu Supabase (los mismos de la web de la barbería) ===== */
+const SB_URL = "https://ldxxflhwpyzldisydhmd.supabase.co";
+const SB_KEY = "sb_publishable_zYVUWmP8r6s21WegS23RxQ_G-MOf1TH";
+/* Tabla y columnas de la barbería de donde se leen los ingresos */
+const BARB_TABLE = "reservas", BARB_STATUS = "cobrada";
+const AMOUNT_COLS = ["monto_cobrado","cobrado","total","precio","monto","importe"]; // prueba en este orden
+
+const CATS = ["Vivienda","Servicios","Comida","Transporte","Salud","Hogar","Ocio","Educación","Otros"];
+const FIJAS = ["Vivienda","Servicios"];
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+const money = v => (v<0?"-$":"$") + Math.abs(Math.round(v||0)).toLocaleString("en-US");
+const sum = a => a.reduce((s,x)=>s+x,0);
+const sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true}});
+let movs=[], barb=[], cfg={fijos:0,pct:20,fondoMeses:3}, tab="res"; const charts={};
+
+function amt(r){ for(const k of AMOUNT_COLS){ if(r[k]!=null && r[k]!=="" && !isNaN(+r[k])) return +r[k]; } return 0; }
+const today = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+$("mes").value = today().slice(0,7);
+
+/* ===== Sesión ===== */
+$("go").onclick = async () => {
+  $("lm").textContent="";
+  const {error} = await sb.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value});
+  if(error){ $("lm").textContent="Correo o contraseña incorrectos."; return; }
+  start();
+};
+$("out").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+(async()=>{ const {data}=await sb.auth.getSession(); if(data.session) start(); })();
+
+async function start(){
+  $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+  await load(); render();
+}
+async function load(){
+  const a = await sb.from("family_movs").select("*").order("fecha",{ascending:false});
+  movs = a.data || [];
+  const c = await sb.from("family_config").select("*").eq("id",1).maybeSingle();
+  if(c.data) cfg = {...cfg, ...c.data.valores};
+  const b = await sb.from(BARB_TABLE).select("*").eq("status",BARB_STATUS);
+  barb = (b.data||[]).map(r=>({fecha:String(r.fecha).slice(0,10), monto:amt(r)}));
+  window.barbErr = b.error ? b.error.message : (barb.length && !sum(barb.map(x=>x.monto)) ? "No encontré la columna del monto en la barbería." : "");
+}
+$("mes").onchange = render;
+$("nav").onclick = e => { const t=e.target.dataset.t; if(!t) return; tab=t;
+  [...$("nav").children].forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  ["res","mov","ase","aju"].forEach(x=>$("p-"+x).classList.toggle("hidden",x!==t)); render(); };
+
+/* ===== Cálculos del mes ===== */
+function calc(){
+  const m = $("mes").value, now = today();
+  const [y,mo] = m.split("-").map(Number), dim = new Date(y,mo,0).getDate();
+  const isNow = now.slice(0,7)===m, day = isNow ? +now.slice(8) : (m<now.slice(0,7)?dim:0);
+  const inM = x => x.fecha.slice(0,7)===m;
+  const bar = barb.filter(inM), mm = movs.filter(inM);
+  const ingBarb = sum(bar.map(x=>x.monto));
+  const ingMan = sum(mm.filter(x=>x.tipo==="ingreso").map(x=>+x.monto));
+  const gastos = mm.filter(x=>x.tipo==="gasto");
+  const gasto = sum(gastos.map(x=>+x.monto));
+  const ahorroMes = sum(mm.filter(x=>x.tipo==="ahorro").map(x=>+x.monto));
+  const ahorroTotal = sum(movs.filter(x=>x.tipo==="ahorro").map(x=>+x.monto));
+  const ingreso = ingBarb + ingMan;
+  const fijoPag = sum(gastos.filter(x=>FIJAS.includes(x.categoria)).map(x=>+x.monto));
+  const fijoPend = Math.max(0, (+cfg.fijos||0) - fijoPag);
+  const metaAhorro = ingreso * (+cfg.pct||0)/100;
+  const ahorroPend = Math.max(0, metaAhorro - ahorroMes);
+  const libre = ingreso - gasto - fijoPend - ahorroPend;
+  const ritmo = day ? gasto/day*dim : 0;
+  const byCat = {}; gastos.forEach(g => byCat[g.categoria]=(byCat[g.categoria]||0)+ +g.monto);
+  const daily = {}; bar.forEach(x=>daily[x.fecha]=(daily[x.fecha]||0)+x.monto);
+  mm.filter(x=>x.tipo==="ingreso").forEach(x=>daily[x.fecha]=(daily[x.fecha]||0)+ +x.monto);
+  const dailyG = {}; gastos.forEach(g=>dailyG[g.fecha]=(dailyG[g.fecha]||0)+ +g.monto);
+  // gasto mensual promedio (meses con gastos) para el fondo de emergencia
+  const meses = {}; movs.filter(x=>x.tipo==="gasto").forEach(x=>{const k=x.fecha.slice(0,7);meses[k]=(meses[k]||0)+ +x.monto});
+  const ks = Object.keys(meses); const promG = ks.length ? sum(ks.map(k=>meses[k]))/ks.length : (+cfg.fijos||0);
+  return {m,dim,day,isNow,ingBarb,ingMan,ingreso,gasto,ahorroMes,ahorroTotal,fijoPend,metaAhorro,ahorroPend,libre,ritmo,byCat,daily,dailyG,promG,mm};
+}
+
+/* ===== Gráficas ===== */
+function chart(id, cfgc){ if(charts[id]) charts[id].destroy(); const el=$(id); if(!el) return;
+  charts[id]=new Chart(el, cfgc); }
+const col = ["#2563eb","#16a34a","#d97706","#dc2626","#7c3aed","#0891b2","#db2777","#65a30d","#64748b"];
+
+/* ===== Páginas ===== */
+function render(){
+  if(!$("app") || $("app").classList.contains("hidden")) return;
+  const c = calc();
+  if(tab==="res") pRes(c); if(tab==="mov") pMov(c); if(tab==="ase") pAse(c); if(tab==="aju") pAju();
+}
+function pRes(c){
+  const bal = c.ingreso - c.gasto - c.ahorroMes;
+  $("p-res").innerHTML = `
+  ${window.barbErr?`<div class="card warn">⚠ Barbería: ${esc(window.barbErr)}</div>`:""}
+  <div class="grid">
+   <div class="card"><div class="k">Ingresos</div><div class="v ok">${money(c.ingreso)}</div><div class="sub">Barbería ${money(c.ingBarb)}</div></div>
+   <div class="card"><div class="k">Gastos</div><div class="v bad">${money(c.gasto)}</div><div class="sub">Ritmo del mes: ${money(c.ritmo)}</div></div>
+   <div class="card"><div class="k">Ahorrado este mes</div><div class="v save">${money(c.ahorroMes)}</div><div class="sub">Meta ${money(c.metaAhorro)}</div></div>
+   <div class="card"><div class="k">Disponible ahora</div><div class="v ${bal>=0?"ok":"bad"}">${money(bal)}</div><div class="sub">Ingresos − gastos − ahorro</div></div>
+  </div>
+  <div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
+  <div class="card"><h2>Ingresos y gastos por día</h2><div class="sub">Cada punto es un día</div><div class="box"><canvas id="c2"></canvas></div></div>
+  <div class="card"><h2>Reparto del mes</h2><div class="box"><canvas id="c3"></canvas></div></div>`;
+  const cats = Object.keys(c.byCat);
+  chart("c1",{type:"doughnut",data:{labels:cats.length?cats:["Sin gastos"],datasets:[{data:cats.length?cats.map(k=>c.byCat[k]):[1],backgroundColor:cats.length?col:["#cbd5e1"],borderWidth:0}]},options:{maintainAspectRatio:false,cutout:"62%",plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
+  const pt = o => Object.keys(o).map(k=>({x:+k.slice(8),y:o[k]}));
+  chart("c2",{type:"scatter",data:{datasets:[{label:"Ingresos",data:pt(c.daily),backgroundColor:"#16a34a",pointRadius:6},{label:"Gastos",data:pt(c.dailyG),backgroundColor:"#dc2626",pointRadius:6}]},options:{maintainAspectRatio:false,scales:{x:{min:1,max:c.dim,title:{display:true,text:"Día del mes"}}}}});
+  chart("c3",{type:"pie",data:{labels:["Gastos","Ahorro","Disponible"],datasets:[{data:[c.gasto,c.ahorroMes,Math.max(0,bal)],backgroundColor:["#dc2626","#2563eb","#16a34a"],borderWidth:0}]},options:{maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
+}
+function pMov(c){
+  $("p-mov").innerHTML = `
+  <div class="card"><h2>Añadir movimiento</h2>
+  <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro (meter dinero)</option><option value="ahorro-">Ahorro (sacar dinero)</option></select></div>
+  <div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
+  <div class="f"><label>Categoría (solo gastos)</label><select id="mc">${CATS.map(x=>`<option>${x}</option>`).join("")}</select></div>
+  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
+  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
+  <button class="btn" id="ms">Guardar</button><p id="mmsg" class="bad"></p></div>
+  <div class="card"><h2>Movimientos del mes</h2>
+  ${c.mm.length? c.mm.map(x=>`<div class="row"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(x.fecha.slice(8)+"/"+x.fecha.slice(5,7))} · ${esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
+  <div style="text-align:right"><b class="${x.tipo==="gasto"?"bad":x.tipo==="ingreso"?"ok":"save"}">${money(x.monto)}</b><br><button class="chip" data-del="${x.id}" style="padding:2px 8px">Borrar</button></div></div>`).join("") : `<p class="sub">Aún no hay movimientos este mes.</p>`}</div>`;
+  $("ms").onclick = async () => {
+    let t=$("mt").value, a=Number($("ma").value); if(!(a>0)){ $("mmsg").textContent="Escribe un monto válido."; return; }
+    if(t==="ahorro-"){ t="ahorro"; a=-a; }
+    const {error}=await sb.from("family_movs").insert({tipo:t,fecha:$("mf").value,categoria:t==="gasto"?$("mc").value:null,descripcion:$("md").value.trim(),monto:a});
+    if(error){ $("mmsg").textContent="No se pudo guardar: "+error.message; return; }
+    await load(); render();
+  };
+  $("p-mov").onclick = async e => { const id=e.target.dataset.del; if(!id||!confirm("¿Borrar este movimiento?")) return;
+    await sb.from("family_movs").delete().eq("id",id); await load(); render(); };
+}
+function pAse(c){
+  const tips=[]; const add=(ic,t)=>tips.push(`<div class="tip">${ic} ${t}</div>`);
+  const fondoMeta = c.promG*(+cfg.fondoMeses||3), fondoPct = fondoMeta?Math.min(100,c.ahorroTotal/fondoMeta*100):0;
+  if(!c.ingreso) add("ℹ️","Todavía no hay ingresos registrados este mes.");
+  else{
+    const tasa = (c.ahorroMes/c.ingreso)*100;
+    if(c.ahorroPend>0) add("💰",`Te faltan ${money(c.ahorroPend)} para tu meta de ahorro del mes (${cfg.pct}% de lo ingresado).`);
+    else add("✅","Ya cumpliste la meta de ahorro de este mes.");
+    if(c.isNow && c.ritmo>c.ingreso*(1-(+cfg.pct||0)/100)) add("⚠️",`Al ritmo actual gastarías ${money(c.ritmo)} este mes, más de lo que puedes sin tocar el ahorro. Reduce gastos no esenciales.`);
+    const top=Object.entries(c.byCat).sort((a,b)=>b[1]-a[1])[0];
+    if(top) add("📊",`Tu mayor gasto es <b>${esc(top[0])}</b>: ${money(top[1])} (${Math.round(top[1]/Math.max(c.gasto,1)*100)}% de tus gastos).`);
+    if(tasa<10 && c.ahorroMes>0) add("📉",`Estás ahorrando solo el ${Math.round(tasa)}% de tus ingresos. Lo sano es 10–20%.`);
+  }
+  if(c.fijoPend>0) add("🏠",`Aún faltan por pagar gastos fijos (vivienda y servicios) por unos ${money(c.fijoPend)}. Ese dinero ya está comprometido.`);
+  $("p-ase").innerHTML = `
+  <div class="card"><h2>Dinero realmente libre este mes</h2><div class="v ${c.libre>=0?"ok":"bad"}">${money(c.libre)}</div>
+  <div class="sub">Ingresos − gastos hechos − fijos pendientes − ahorro pendiente</div></div>
+  <div class="card"><h2>Fondo de emergencia</h2><div class="sub">Meta: ${cfg.fondoMeses} meses de gastos = ${money(fondoMeta)}</div>
+  <div class="v save">${money(c.ahorroTotal)}</div><div class="bar"><i style="width:${fondoPct}%"></i></div><div class="sub">${Math.round(fondoPct)}% completado</div></div>
+  <div class="card"><h2>¿Puedo comprar algo?</h2><div class="f"><label>Precio</label><input id="pp" type="number" inputmode="decimal"></div>
+  <div class="f"><label>¿Es necesario?</label><select id="pn"><option value="1">Sí, lo necesitamos</option><option value="0">Es un gusto / antojo</option></select></div>
+  <button class="btn" id="pb">Pedir consejo</button><div id="pv"></div></div>
+  <div class="card"><h2>Observaciones</h2>${tips.join("")||"<p class='sub'>Sin observaciones.</p>"}</div>`;
+  $("pb").onclick = () => {
+    const p=Number($("pp").value), need=$("pn").value==="1"; if(!(p>0)) return;
+    let t,cl,x;
+    const fondoOk = c.ahorroTotal>=fondoMeta;
+    if(p<=c.libre*0.5 && (fondoOk||need)){cl="ok";t="Adelante ✅";x="Cabe cómodamente en tu dinero libre sin tocar ahorro ni gastos fijos."}
+    else if(p<=c.libre){ if(need){cl="warn";t="Se puede, con cuidado 🟡";x="Cabe, pero te deja muy poco margen este mes. Busca comparar precios."} else {cl="warn";t="Mejor espera 🟡";x="Cabe, pero es un gusto y te deja poco margen. Espera a la próxima semana o a tener el fondo de emergencia completo."}}
+    else if(need){cl="warn";t="Es necesario, pero no te alcanza el libre 🟠";x=`Te faltarían ${money(p-Math.max(c.libre,0))}. Considera pagarlo en parte, esperar a nuevos ingresos o sacar solo lo mínimo del ahorro.`}
+    else{cl="bad";t="No por ahora ⛔";x="Supera tu dinero libre y no es necesario. Hazlo cuando sobre sin tocar el ahorro."}
+    $("pv").innerHTML=`<div class="verdict" style="border-color:var(--${cl})"><b>${t}</b><div class="sub" style="margin-top:4px">${x}</div></div>`;
+  };
+}
+function pAju(){
+  $("p-aju").innerHTML = `<div class="card"><h2>Ajustes</h2>
+  <div class="f"><label>Gastos fijos al mes (vivienda + servicios)</label><input id="a1" type="number" value="${+cfg.fijos||0}"></div>
+  <div class="f"><label>% de ingresos que quieren ahorrar</label><input id="a2" type="number" value="${+cfg.pct||0}"></div>
+  <div class="f"><label>Fondo de emergencia: meses de gastos</label><input id="a3" type="number" value="${+cfg.fondoMeses||3}"></div>
+  <button class="btn" id="as">Guardar ajustes</button><p id="am" class="sub"></p></div>`;
+  $("as").onclick = async () => {
+    cfg = {fijos:Number($("a1").value)||0, pct:Number($("a2").value)||0, fondoMeses:Number($("a3").value)||3};
+    const {error}=await sb.from("family_config").upsert({id:1,valores:cfg});
+    $("am").textContent = error ? "Error: "+error.message : "Guardado ✓";
+  };
+}
+</script></body></html>
