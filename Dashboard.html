@@ -35,6 +35,21 @@ nav button.on{color:var(--ink);font-weight:700;border-top:2px solid var(--ink)}
 .verdict{border-left:5px solid var(--mut);padding:12px 14px;border-radius:8px;background:var(--bg);margin-top:12px}
 .bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--save)}
 .tip{padding:9px 0;border-bottom:1px solid var(--line)}.tip:last-child{border:0}
+button,.chip,.btn,nav button{transition:transform .08s,box-shadow .08s,filter .08s}
+button:active:not(:disabled){transform:translateY(2px) scale(.94);filter:brightness(.8);box-shadow:inset 0 3px 8px rgba(0,0,0,.4)}
+.btn.busy{opacity:.85;pointer-events:none}
+.btn.busy::before{content:"";display:inline-block;width:13px;height:13px;margin-right:8px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+.btn.done{background:var(--ok);color:#fff}
+@keyframes sp{to{transform:rotate(360deg)}}
+.info{width:20px;height:20px;border-radius:50%;border:1px solid var(--mut);background:transparent;color:var(--mut);font-size:12px;line-height:1;padding:0;margin-left:6px;vertical-align:middle}
+.help{margin:6px 0 10px;padding:9px 11px;background:var(--bg);border-left:3px solid var(--save);border-radius:6px;font-size:13.5px;line-height:1.5;font-weight:400;color:var(--ink)}
+#live{position:fixed;top:calc(env(safe-area-inset-top) + 62px);right:10px;z-index:30;display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+#live i{width:9px;height:9px;border-radius:50%;background:var(--ok);animation:pl 1.6s ease-in-out infinite}
+#live.save i{width:11px;height:11px;background:transparent;border:2px solid var(--warn);border-top-color:transparent;animation:sp .7s linear infinite}
+#live.bad i{background:var(--bad);animation:none}
+@keyframes pl{50%{opacity:.25;transform:scale(1.5)}}
+.crow{display:grid;grid-template-columns:1fr 70px 40px;gap:8px;align-items:center;margin-bottom:8px}
+.crow label{font-size:13px;color:var(--mut);display:flex;gap:5px;align-items:center}.crow input[type=checkbox]{width:20px;height:20px;padding:0}
 #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}#login .b{width:100%;max-width:360px}
 </style></head><body>
 
@@ -45,6 +60,7 @@ nav button.on{color:var(--ink);font-weight:700;border-top:2px solid var(--ink)}
 <button class="btn" id="go">Entrar</button><p id="lm" class="bad"></p></div></section>
 
 <section id="app" class="hidden">
+<div id="live"><i></i><span>Conectando…</span></div>
 <header><div class="hr"><h1>Finanzas del Hogar</h1><div style="display:flex;gap:6px"><input type="month" id="mes" style="width:auto;padding:6px"><button class="chip" id="out">Salir</button></div></div></header>
 <main><div id="err"></div>
 <div id="p-res"></div><div id="p-mov" class="hidden"></div><div id="p-met" class="hidden"></div><div id="p-pla" class="hidden"></div><div id="p-ase" class="hidden"></div><div id="p-aju" class="hidden"></div></main>
@@ -53,11 +69,11 @@ nav button.on{color:var(--ink);font-weight:700;border-top:2px solid var(--ink)}
 
 <script>
 const SB_URL="https://ldxxflhwpyzldisydhmd.supabase.co", SB_KEY="sb_publishable_zYVUWmP8r6s21WegS23RxQ_G-MOf1TH";
-const CATS=["Vivienda","Servicios","Comida","Transporte","Salud","Hogar","Ocio","Educación","Otros"], FIJAS=["Vivienda","Servicios"];
+const catsG=()=>cfg.catG.map(x=>x.n),fijasC=()=>cfg.catG.filter(x=>x.f).map(x=>x.n),rd10=v=>Math.round(v/10)*10;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const num=v=>{const n=Number(String(v??"").replace(",","."));return Number.isFinite(n)?n:0};
-const money=v=>(v<0?"-$":"$")+Math.abs(Math.round(v||0)).toLocaleString("en-US");
+const money=v=>{const r=rd10(v||0);return(r<0?"-$":"$")+Math.abs(r).toLocaleString("en-US")};
 const sum=a=>a.reduce((s,x)=>s+x,0), digits=s=>String(s??"").replace(/\D/g,"");
 const fmt=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const parseD=s=>{const p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2])};
@@ -68,7 +84,9 @@ function passed(f,t){const n=today();if(f<n)return true;if(f>n)return false;cons
 
 const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
 let movs=[],turnos=[],gb=[],CB={},B={},RES=[],_fin={},charts={},tab="res";
-let cfg={pctA:10,pctD:0,pctM:10,fondoMeses:3,fijosPorMes:{},metas:[],deudas:[]};
+let cfg={pctF:40,pctA:10,pctD:0,pctM:10,fondoMeses:3,fijosPorMes:{},metas:[],deudas:[],
+ catG:[{n:"Vivienda",f:1},{n:"Servicios",f:1},{n:"Comida"},{n:"Transporte"},{n:"Salud"},{n:"Hogar"},{n:"Ocio"},{n:"Educación"},{n:"Otros"}],
+ catI:["Extra","Venta","Regalo","Otros"]};
 $("mes").value=today().slice(0,7);
 
 /* ---------- Sesión ---------- */
@@ -81,7 +99,7 @@ async function start(){$("login").classList.add("hidden");$("app").classList.rem
 /* ---------- Datos ---------- */
 async function all(t,q){let f=0,o=[];for(;;){let r=sb.from(t).select("*");if(q)r=q(r);const{data,error}=await r.order("id").range(f,f+999);if(error)throw error;o=o.concat(data||[]);if(!data||data.length<1000)break;f+=1000}return o}
 async function load(){
- $("err").innerHTML="";_fin={};
+ $("err").innerHTML="";_fin={};live("save","Actualizando…");
  try{
   movs=await all("family_movs");
   const c=await sb.from("family_config").select("valores").eq("id",1).maybeSingle();
@@ -95,8 +113,8 @@ async function load(){
   turnos=await all("turnos",q=>q.gte("fecha",B.start).lte("fecha","2999-12-31"));
   const g=await all("gastos");
   gb=g.filter(x=>String(x.fecha)>=B.start&&!/^(aporte|devolucion) personal/.test(String(x.descripcion||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")));
-  build();
- }catch(e){$("err").innerHTML='<div class="card bad">No se pudieron leer los datos: '+esc(e.message||e)+'</div>'}
+  build();lastOk=Date.now();live("idle");
+ }catch(e){live("bad","Sin conexión");$("err").innerHTML='<div class="card bad">No se pudieron leer los datos: '+esc(e.message||e)+'</div>'}
 }
 
 /* ---------- Barbería: SOLO tu ganancia neta (misma regla que tu panel de la barbería) ---------- */
@@ -162,6 +180,22 @@ function proj(m){
 }
 
 /* ---------- Cálculos familiares ---------- */
+function alloc(day){
+ const m=day.slice(0,7),nm=m>=B.start.slice(0,7)?netMonth(m):{days:{}},dd={...nm.days};
+ movs.filter(x=>x.tipo==="ingreso"&&String(x.fecha).slice(0,7)===m).forEach(x=>{const d=String(x.fecha).slice(0,10);dd[d]=(dd[d]||0)+num(x.monto)});
+ const fj=fijosOf(m).filter(x=>num(x.a)>0),tot=sum(fj.map(x=>num(x.a))),hasD=cfg.deudas.length>0;
+ let acc=0,o={net:0,fj:[],ah:0,me:0,de:0,libre:0};
+ Object.keys(dd).sort().forEach(d=>{if(d>day)return;const net=dd[d],ft=Math.max(0,rd10(Math.min(net*cfg.pctF/100,net,tot-acc)));acc+=ft;
+  if(d!==day)return;let left=ft;
+  const items=fj.map((x,i)=>{const v=i===fj.length-1?Math.max(0,left):Math.min(left,rd10(ft*num(x.a)/tot));left-=v;return{n:x.n,v}});
+  const ah=rd10(net*cfg.pctA/100),me=rd10(net*cfg.pctM/100),de=hasD?rd10(net*cfg.pctD/100):0;
+  o={net,fj:items,ah,me,de,libre:Math.max(0,net-ft-ah-me-de)}});
+ return o}
+function hoyHtml(){const a=alloc(today()),r=(t,s,v,c)=>`<div class="row"><div><b>${t}</b><div class="sub">${s}</div></div><b class="${c}">${money(v)}</b></div>`;
+ if(!a.net)return`<div class="card"><h2>Reparto de hoy</h2><div class="sub">Todavía no hay ganancia hoy. Cuando cobres clientes, aquí verás cuánto separar.</div></div>`;
+ return`<div class="card"><h2>Reparto de hoy</h2><div class="sub">Ganancia neta de hoy: <b>${money(a.net)}</b>. Al terminar el día separa estos billetes:</div><div style="margin-top:6px">`+
+  a.fj.map(x=>r(esc(x.n),"gasto fijo",x.v,"bad")).join("")+r("Ahorro",cfg.pctA+"% de hoy",a.ah,"save")+r("Metas",cfg.pctM+"% de hoy",a.me,"save")+
+  (cfg.deudas.length?r("Deudas",cfg.pctD+"% de hoy",a.de,"warn"):"")+r("Para ti hoy","lo que queda libre",a.libre,"ok")+'</div></div>'}
 const fijosOf=m=>{const ks=Object.keys(cfg.fijosPorMes).filter(k=>k<=m).sort();return ks.length?cfg.fijosPorMes[ks[ks.length-1]]:[]};
 const ofTipo=(l,t)=>sum(l.filter(x=>x.tipo===t).map(x=>num(x.monto)));
 function calc(){
@@ -170,10 +204,10 @@ function calc(){
  const mm=movs.filter(x=>String(x.fecha).slice(0,7)===m),gs=mm.filter(x=>x.tipo==="gasto");
  const nm=m>=B.start.slice(0,7)?netMonth(m):{libre:0,days:{}};
  const ingMan=ofTipo(mm,"ingreso"),ingreso=nm.libre+ingMan,gasto=ofTipo(mm,"gasto");
- const fijos=sum(fijosOf(m).map(x=>num(x.a))),fijoPag=sum(gs.filter(x=>FIJAS.includes(x.categoria)).map(x=>num(x.monto)));
+ const fijos=sum(fijosOf(m).map(x=>num(x.a))),fijoPag=sum(gs.filter(x=>fijasC().includes(x.categoria)).map(x=>num(x.monto)));
  const fijoPend=Math.max(0,fijos-fijoPag);
  const aA=ofTipo(mm,"ahorro"),aD=ofTipo(mm,"deuda"),aM=ofTipo(mm,"meta"),hasD=cfg.deudas.length>0;
- const mA=ingreso*cfg.pctA/100,mD=hasD?ingreso*cfg.pctD/100:0,mM=ingreso*cfg.pctM/100;
+ const mA=rd10(ingreso*cfg.pctA/100),mD=hasD?rd10(ingreso*cfg.pctD/100):0,mM=rd10(ingreso*cfg.pctM/100);
  const pA=Math.max(0,mA-aA),pD=Math.max(0,mD-aD),pM=Math.max(0,mM-aM);
  const libre=ingreso-gasto-fijoPend-pA-pD-pM,bal=ingreso-gasto-aA-aD-aM;
  const byCat={};gs.forEach(g=>byCat[g.categoria]=(byCat[g.categoria]||0)+num(g.monto));
@@ -194,7 +228,7 @@ $("nav").onclick=e=>{const t=e.target.dataset.t;if(!t)return;tab=t;[...$("nav").
  ["res","mov","met","pla","ase","aju"].forEach(x=>$("p-"+x).classList.toggle("hidden",x!==t));render()};
 function render(){
  if($("app").classList.contains("hidden"))return;const c=calc();
- ({res:pRes,mov:pMov,met:pMet,pla:pPla,ase:pAse,aju:pAju})[tab](c);
+ ({res:pRes,mov:pMov,met:pMet,pla:pPla,ase:pAse,aju:pAju})[tab](c);enhance($("p-"+tab));
 }
 function pRes(c){
  $("p-res").innerHTML=`<div class="grid">
@@ -202,7 +236,7 @@ function pRes(c){
  <div class="card"><div class="k">Gastos</div><div class="v bad">${money(c.gasto)}</div><div class="sub">Ritmo del mes ${money(c.ritmo)}</div></div>
  <div class="card"><div class="k">Apartado (ahorro, metas, deudas)</div><div class="v save">${money(c.aA+c.aM+c.aD)}</div></div>
  <div class="card"><div class="k">Queda en la mano</div><div class="v ${c.bal>=0?"ok":"bad"}">${money(c.bal)}</div></div></div>
- <div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
+ ${hoyHtml()}<div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
  <div class="card"><h2>Ingresos y gastos por día</h2><div class="sub">Cada punto es un día</div><div class="box"><canvas id="c2"></canvas></div></div>
  <div class="card"><h2>Reparto del mes</h2><div class="box"><canvas id="c3"></canvas></div></div>`;
  const k=Object.keys(c.byCat);
@@ -215,22 +249,22 @@ const opts=a=>a.map(x=>`<option value="${esc(x.id||x)}">${esc(x.n||x)}</option>`
 function pMov(c){
  $("p-mov").innerHTML=`<div class="card"><h2>Añadir movimiento</h2>
  <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro: meter dinero</option><option value="ahorro-">Ahorro: sacar dinero</option><option value="meta">Aporte a una meta</option><option value="deuda">Pago de una deuda</option></select></div>
- <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(CATS)}</select></div>
+ <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(catsG())}</select></div>
  <div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
  <button class="btn" id="ms">Guardar</button><p id="mmsg" class="bad"></p></div>
  <div class="card"><h2>Movimientos del mes</h2>${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(x=>`<div class="row"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
  <div style="text-align:right"><b>${money(x.monto)}</b><br><button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div>`;
- const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":"—";
-  $("mc").parentNode.classList.toggle("hidden",!["gasto","meta","deuda"].includes(t));
-  $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):opts(CATS)};
+ const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":"—";
+  $("mc").parentNode.classList.toggle("hidden",!["gasto","ingreso","meta","deuda"].includes(t));
+  $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):t==="ingreso"?opts(cfg.catI):opts(catsG())};
  $("mt").onchange=sel;
- $("ms").onclick=async()=>{let t=$("mt").value,a=num($("ma").value);if(!(a>0)){$("mmsg").textContent="Escribe un monto válido.";return}
+ $("ms").onclick=function(){const bt=this;let t=$("mt").value,a=num($("ma").value);if(!(a>0)){$("mmsg").textContent="Escribe un monto válido.";return}
   if(t==="ahorro-"){t="ahorro";a=-a}
   if((t==="meta"||t==="deuda")&&!$("mc").value){$("mmsg").textContent="Primero crea una "+t+" en la pantalla Metas.";return}
-  const{error}=await sb.from("family_movs").insert({tipo:t,fecha:$("mf").value,categoria:["gasto","meta","deuda"].includes(t)?$("mc").value:null,descripcion:$("md").value.trim(),monto:a});
-  if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return}await load();render()};
+  const row={tipo:t,fecha:$("mf").value,categoria:["gasto","meta","deuda","ingreso"].includes(t)?$("mc").value:null,descripcion:$("md").value.trim(),monto:a};
+  saving(bt,async()=>{const{error}=await sb.from("family_movs").insert(row);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}await load();return true})};
 }
 const saveCfg=async()=>{const{error}=await sb.from("family_config").upsert({id:1,valores:cfg});if(error)alert("No se pudo guardar: "+error.message);return!error};
 function eta(falta,a){if(falta<=0)return"¡Lograda! 🎉";if(!(a>0))return"Pon un aporte mensual para calcular";const n=Math.ceil(falta/a),d=new Date();d.setMonth(d.getMonth()+n);return"~"+n+" mes(es) · "+d.toLocaleDateString("es",{month:"long",year:"numeric"})}
@@ -281,38 +315,84 @@ function pAse(c){
   else{cl="bad";t="No por ahora ⛔";x="Supera tu dinero libre y no es necesario."}
   $("pv").innerHTML=`<div class="verdict" style="border-color:var(--${cl})"><b>${t}</b><div class="sub">${x}</div></div>`};
 }
+const crow=(n,f,g)=>'<div class="crow"><input class="cn" value="'+esc(n)+'" placeholder="Nombre">'+(g?'<label><input type="checkbox" class="cf"'+(f?" checked":"")+'> fijo</label>':'<span></span>')+'<button class="chip" data-fx>×</button></div>';
 function pAju(c){
  const fj=fijosOf(c.m);
- $("p-aju").innerHTML=`<div class="card"><h2>Gastos fijos de ${esc(c.m)}</h2><div class="sub">Renta, luz, agua, internet… Cada mes puedes cambiarlos: lo que edites aquí vale desde este mes en adelante. Al pagarlos, anótalos como gasto de categoría Vivienda o Servicios.</div><div id="fj" style="margin-top:8px">
+ $("p-aju").innerHTML=`<div class="card"><h2>Gastos fijos de ${esc(c.m)}</h2><div class="sub">Renta, luz, agua, internet… Cada mes puedes cambiarlos: lo que edites aquí vale desde este mes en adelante.</div><div id="fj" style="margin-top:8px">
  ${fj.map(x=>`<div class="two"><input class="fn" value="${esc(x.n)}" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal" value="${num(x.a)}"><button class="chip" data-fx>×</button></div>`).join("")}</div>
  <button class="chip" data-fadd style="width:100%;margin-bottom:8px">+ Añadir gasto fijo</button><div class="sub">Total: <b>${money(c.fijos)}</b></div></div>
- <div class="card"><h2>¿Cuánto separas de tu ganancia?</h2><div class="sub">Porcentajes de tu ganancia neta del mes.</div>
+ <div class="card"><h2>¿Cuánto separas de tu ganancia?</h2><div class="sub">Porcentajes de tu ganancia neta de cada día. Todo se redondea a múltiplos de 10.</div>
+ <div class="f"><label>% para gastos fijos (se reparte entre cada uno)</label><input id="pfx" type="number" value="${cfg.pctF}"></div>
  <div class="f"><label>% para ahorro</label><input id="pa" type="number" value="${cfg.pctA}"></div>
  <div class="f"><label>% para metas</label><input id="pm" type="number" value="${cfg.pctM}"></div>
  <div class="f"><label>% para pagar deudas</label><input id="pd" type="number" value="${cfg.pctD}"></div>
  <div class="f"><label>Fondo de emergencia: meses de gastos</label><input id="pf" type="number" value="${cfg.fondoMeses}"></div></div>
- <button class="btn" data-save="1">Guardar ajustes</button><p id="am" class="sub"></p>`;
+ <div class="card"><h2>Categorías de gastos</h2><div class="sub">Marca «fijo» las que son gastos fijos (renta, luz…).</div><div id="cg" style="margin-top:8px">${cfg.catG.map(x=>crow(x.n,x.f,1)).join("")}</div>
+ <button class="chip" data-cadd="g" style="width:100%">+ Añadir categoría</button></div>
+ <div class="card"><h2>Categorías de ingresos</h2><div class="sub">Para los ingresos que anotes aparte de la barbería.</div><div id="ci" style="margin-top:8px">${cfg.catI.map(x=>crow(x,0,0)).join("")}</div>
+ <button class="chip" data-cadd="i" style="width:100%">+ Añadir categoría</button></div>
+ <button class="btn" data-save="1">Guardar ajustes</button><p id="am" class="bad"></p>`;
 }
-
+const HELP={
+"Tu ganancia neta (barbería)":"Lo que te queda a ti de la barbería este mes, después de que tu panel de la barbería separa sus gastos y su ahorro. Se trae solo, no lo escribes.",
+"Gastos":"Todo lo que han gastado este mes según lo que anotaron en la pantalla Gastos.",
+"Apartado (ahorro, metas, deudas)":"Dinero que ya separaron este mes para ahorro, metas o pagar deudas.",
+"Queda en la mano":"Ganancia más ingresos extra, menos gastos y menos lo que ya apartaron.",
+"Reparto de hoy":"Cómo repartir la ganancia neta de hoy: cuánto va a cada gasto fijo, ahorro, metas y deudas. Lo que sobra es tuyo. Cámbialo en Ajustes con los porcentajes.",
+"¿A dónde se va el dinero?":"Gráfica de círculo: cada color es una categoría de gastos y su tamaño es cuánto se gastó en ella.",
+"Ingresos y gastos por día":"Cada punto verde es lo que ganaste ese día y cada punto rojo lo que gastaste. Sirve para ver en qué días entra o sale más dinero.",
+"Reparto del mes":"Del dinero del mes, qué parte se fue en gastos, ahorro, metas, deudas y cuánto queda.",
+"Añadir movimiento":"Aquí anotas gastos, ingresos extra, ahorro y aportes a metas o deudas. Los gastos fijos págalos aquí con una categoría marcada «fijo».",
+"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido. Puedes borrar lo que se anotó mal.",
+"Metas":"Cosas que quieren comprar o lograr. El tiempo se calcula dividiendo lo que falta entre el aporte mensual que le asignaste.",
+"Nueva meta":"Pon el nombre, cuánto cuesta y cuánto le aportarás cada mes. Con eso la web calcula en qué mes la completan.",
+"Deudas":"Lo que deben. La web calcula cuándo terminan según la cuota mensual. El % de deudas solo se aparta si hay alguna anotada.",
+"Nueva deuda":"Pon cuánto debes en total y cuánto pagas por mes.",
+"¿Cuánto vas a ganar este mes?":"Línea verde: lo ganado hasta hoy. Línea azul: lo que se estima que ganarás, usando tus citas ya reservadas y tu ritmo normal. Todo es ganancia neta tuya.",
+"Dinero realmente libre":"Lo que puedes gastar sin dañar nada: ganancia menos gastos hechos, fijos que faltan y lo que falta por apartar.",
+"Fondo de emergencia":"Ahorro para imprevistos. La meta son varios meses de gastos; la barra muestra cuánto llevan.",
+"¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
+"Observaciones":"Avisos automáticos sobre cómo va el mes.",
+"Gastos fijos de*":"Los gastos que se repiten cada mes. Se reparten cada día desde tu ganancia hasta cubrirlos.",
+"¿Cuánto separas":"Qué porcentaje de cada ganancia diaria va a cada cosa. Si suman más de 100% no te deja guardar.",
+"Categorías de gastos":"Los tipos de gasto que verás al anotar. Puedes crear, renombrar o borrar. «Fijo» significa que cuenta como gasto fijo pagado.",
+"Categorías de ingresos":"Los tipos de ingreso extra (aparte de la barbería) que verás al anotar."};
+function enhance(root){root.querySelectorAll("h2,.k").forEach(n=>{if(n.dataset.h)return;const t=n.textContent.trim();
+ const k=HELP[t]!==undefined?t:Object.keys(HELP).find(x=>x.endsWith("*")&&t.startsWith(x.slice(0,-1)))||Object.keys(HELP).find(x=>x==="¿Cuánto separas"&&t.startsWith(x));
+ if(!k)return;n.dataset.h=1;n.insertAdjacentHTML("beforeend",' <button class="info" data-help>?</button>');n.insertAdjacentHTML("afterend",'<div class="help hidden">'+HELP[k]+'</div>')})}
+let lastOk=0,liveKind="idle";
+const livetxt=()=>{if(!lastOk)return"Conectando…";const s=Math.round((Date.now()-lastOk)/1000);return"En vivo · "+(s<10?"ahora":s<60?"hace "+s+" s":"hace "+Math.floor(s/60)+" min")};
+function live(k,t){liveKind=k;const el=$("live");el.className=k==="idle"?"":k;el.querySelector("span").textContent=k==="idle"?livetxt():t}
+async function saving(btn,fn){const old=btn.textContent;btn.disabled=true;btn.classList.add("busy");btn.textContent="Guardando…";live("save","Guardando…");
+ let ok=false;try{ok=await fn()}catch(e){alert(e.message||e)}
+ btn.classList.remove("busy");btn.textContent=ok?"¡Guardado ✓!":"No se guardó";if(ok)btn.classList.add("done");live(ok?"ok":"bad",ok?"Guardado ✓":"Error al guardar");
+ setTimeout(()=>{btn.textContent=old;btn.classList.remove("done");btn.disabled=false;live("idle");if(ok)render()},1200)}
+async function refresh(){if(document.hidden||$("app").classList.contains("hidden")||liveKind==="save")return;await load();
+ if(["res","pla","ase"].includes(tab)&&!document.activeElement.matches("input,select,textarea"))render()}
+setInterval(refresh,60000);setInterval(()=>{if(liveKind==="idle")live("idle")},5000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-lastOk>60000)refresh()});
 /* ---------- Eventos ---------- */
 document.addEventListener("click",async e=>{
  const t=e.target;let b;
+ if(b=t.closest("[data-help]")){b.parentNode.nextElementSibling.classList.toggle("hidden");return}
+ if(b=t.closest("[data-cadd]")){const g=b.dataset.cadd==="g";$(g?"cg":"ci").insertAdjacentHTML("beforeend",crow("",0,g));return}
  if(b=t.closest("[data-del]")){if(!confirm("¿Borrar este movimiento?"))return;await sb.from("family_movs").delete().eq("id",b.dataset.del);await load();render();return}
  if(b=t.closest("[data-fx]")){b.parentNode.remove();return}
  if(b=t.closest("[data-fadd]")){$("fj").insertAdjacentHTML("beforeend",'<div class="two"><input class="fn" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal"><button class="chip" data-fx>×</button></div>');return}
  if(b=t.closest("[data-save]")){
-  const m=$("mes").value;cfg.fijosPorMes[m]=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value)})).filter(x=>x.n||x.a);
-  cfg.pctA=num($("pa").value);cfg.pctM=num($("pm").value);cfg.pctD=num($("pd").value);cfg.fondoMeses=num($("pf").value)||3;
-  if(cfg.pctA+cfg.pctM+cfg.pctD>100){$("am").textContent="Los porcentajes suman más de 100%.";return}
-  $("am").textContent=(await saveCfg())?"Guardado ✓":"";render();return}
- if(b=t.closest("[data-add]")){
-  if(b.dataset.add==="meta"){const n=$("gn").value.trim(),o=num($("go").value);if(!n||!(o>0)){alert("Escribe nombre y precio.");return}
-   cfg.metas.push({id:"m"+Date.now(),n,obj:o,ap:num($("ga").value),ini:num($("gi").value)})}
-  else{const n=$("dn").value.trim(),o=num($("dt").value);if(!n||!(o>0)){alert("Escribe nombre y total.");return}
-   cfg.deudas.push({id:"d"+Date.now(),n,tot:o,cuota:num($("dc").value)})}
-  if(await saveCfg())render();return}
+  const m=$("mes").value,nf=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value)})).filter(x=>x.n||x.a),
+   cg=[...document.querySelectorAll("#cg .crow")].map(r=>({n:r.querySelector(".cn").value.trim(),f:r.querySelector(".cf").checked?1:0})).filter(x=>x.n),
+   ci=[...document.querySelectorAll("#ci .crow")].map(r=>r.querySelector(".cn").value.trim()).filter(Boolean),
+   pp={pctF:num($("pfx").value),pctA:num($("pa").value),pctM:num($("pm").value),pctD:num($("pd").value)};
+  if(pp.pctF+pp.pctA+pp.pctM+pp.pctD>100){$("am").textContent="Los porcentajes suman más de 100%: bájalos.";return}
+  $("am").textContent="";saving(b,async()=>{cfg.fijosPorMes[m]=nf;Object.assign(cfg,pp,{catG:cg,catI:ci,fondoMeses:num($("pf").value)||3});return await saveCfg()});return}
+ if(b=t.closest("[data-add]")){let it,k;
+  if(b.dataset.add==="meta"){const n=$("gn").value.trim(),o=num($("go").value);if(!n||!(o>0)){alert("Escribe nombre y precio.");return}k="metas";it={id:"m"+Date.now(),n,obj:o,ap:num($("ga").value),ini:num($("gi").value)}}
+  else{const n=$("dn").value.trim(),o=num($("dt").value);if(!n||!(o>0)){alert("Escribe nombre y total.");return}k="deudas";it={id:"d"+Date.now(),n,tot:o,cuota:num($("dc").value)}}
+  saving(b,async()=>{cfg[k].push(it);return await saveCfg()});return}
  if(b=t.closest("[data-dg]")){const[k,id]=b.dataset.dg.split(":");if(!confirm("¿Borrar?"))return;cfg[k]=cfg[k].filter(x=>x.id!==id);if(await saveCfg())render();return}
- if(b=t.closest("[data-ap]")){const[k,id]=b.dataset.ap.split(":"),g=cfg[k+"s"==="metas"?"metas":"deudas"].find(x=>x.id===id),a=num(prompt("¿Cuánto?"));if(!(a>0))return;
-  const{error}=await sb.from("family_movs").insert({tipo:k,fecha:today(),categoria:id,descripcion:g?g.n:"",monto:a});if(error){alert(error.message);return}await load();render()}
+ if(b=t.closest("[data-ap]")){const[k,id]=b.dataset.ap.split(":"),g=cfg[k==="meta"?"metas":"deudas"].find(x=>x.id===id),a=num(prompt("¿Cuánto?"));if(!(a>0))return;
+  live("save","Guardando…");const{error}=await sb.from("family_movs").insert({tipo:k,fecha:today(),categoria:id,descripcion:g?g.n:"",monto:a});
+  if(error){live("bad","Error al guardar");alert(error.message);return}await load();live("ok","Guardado ✓");setTimeout(()=>live("idle"),1500);render()}
 });
 </script></body></html>
