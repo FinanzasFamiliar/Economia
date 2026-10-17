@@ -28,7 +28,7 @@ h2{font-size:16px;margin:0 0 6px}.box{height:230px;position:relative}
 .row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}
 .sub{color:var(--mut);font-size:13px}
 .f{margin-bottom:10px}.f label{display:block;font-size:13px;color:var(--mut);margin-bottom:3px}
-.two{display:grid;grid-template-columns:1fr 110px 40px;gap:8px;margin-bottom:8px}
+.two{display:grid;grid-template-columns:1fr 90px 58px 40px;gap:8px;margin-bottom:8px}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:4px 2px calc(env(safe-area-inset-bottom) + 4px)}
 nav button{flex:1;border:0;background:none;color:var(--mut);font-size:11.5px;padding:9px 1px}
 nav button.on{color:var(--ink);font-weight:700;border-top:2px solid var(--ink)}
@@ -65,7 +65,7 @@ button:active:not(:disabled){transform:translateY(2px) scale(.94);filter:brightn
 <header><div class="hr"><h1>Finanzas del Hogar</h1><div style="display:flex;gap:6px"><input type="month" id="mes" style="width:auto;padding:6px"><button class="chip" id="out">Salir</button></div></div></header>
 <main><div id="err"></div>
 <div id="p-res"></div><div id="p-mov" class="hidden"></div><div id="p-met" class="hidden"></div><div id="p-pla" class="hidden"></div><div id="p-ase" class="hidden"></div><div id="p-aju" class="hidden"></div></main>
-<nav id="nav"><button data-t="res" class="on">Resumen</button><button data-t="mov">Gastos</button><button data-t="met">Metas</button><button data-t="pla">Plan</button><button data-t="ase">Asesor</button><button data-t="aju">Ajustes</button></nav>
+<nav id="nav"><button data-t="res" class="on">Resumen</button><button data-t="mov">Gastos</button><button data-t="met">Metas</button><button data-t="pla">Sobres</button><button data-t="ase">Asesor</button><button data-t="aju">Ajustes</button></nav>
 </section>
 
 <script>
@@ -206,7 +206,7 @@ function calc(mp){
  const mm=movs.filter(x=>String(x.fecha).slice(0,7)===m),gs=mm.filter(x=>x.tipo==="gasto");
  const nm=netFrom(m);
  const ingMan=ofTipo(mm,"ingreso"),ingreso=nm.libre+ingMan,gasto=ofTipo(mm,"gasto");
- const fijos=sum(fijosOf(m).map(x=>num(x.a))),fijoPag=sum(gs.filter(x=>fijasC().includes(x.categoria)).map(x=>num(x.monto)));
+ const fijos=sum(fijosOf(m).map(x=>num(x.a))),fijoPag=sum(gs.filter(x=>fijasC().concat(fijosOf(m).map(y=>y.n)).includes(x.categoria)).map(x=>num(x.monto)));
  const fijoPend=Math.max(0,fijos-fijoPag);
  const aA=ofTipo(mm,"ahorro"),aD=ofTipo(mm,"deuda"),aM=ofTipo(mm,"meta"),hasD=cfg.deudas.length>0;
  const mA=rd10(ingreso*cfg.pctA/100),mD=hasD?rd10(ingreso*cfg.pctD/100):0,mM=rd10(ingreso*cfg.pctM/100);
@@ -250,23 +250,32 @@ function pRes(c){
 const opts=a=>a.map(x=>`<option value="${esc(x.id||x)}">${esc(x.n||x)}</option>`).join("");
 function pMov(c){
  $("p-mov").innerHTML=`<div class="card"><h2>Añadir movimiento</h2>
- <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro: meter dinero</option><option value="ahorro-">Ahorro: sacar dinero</option><option value="meta">Aporte a una meta</option><option value="deuda">Pago de una deuda</option></select></div>
- <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(catsG())}</select></div>
- <div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
+ <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro: meter dinero</option><option value="ahorro-">Ahorro: sacar dinero</option><option value="meta">Aporte a una meta</option><option value="deuda">Pago de una deuda</option><option value="mover">Mover dinero entre sobres</option></select></div>
+ <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(gastoCats())}</select></div>
+ <div class="f hidden" id="mxw"><label>Sacar de</label><select id="mx"></select></div><div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
  <button class="btn" id="ms">Guardar</button><p id="mmsg" class="bad"></p></div>
  <div class="card"><h2>Movimientos del mes</h2>${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).map(x=>`<div class="row"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
  <div style="text-align:right"><b>${money(x.monto)}</b><br><button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div>`;
- const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":"—";
-  $("mc").parentNode.classList.toggle("hidden",!["gasto","ingreso","meta","deuda"].includes(t));
-  $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):t==="ingreso"?opts(cfg.catI):opts(catsG())};
+ const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría / sobre":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":t==="mover"?"Mover a (sobre)":"—";
+  $("mc").parentNode.classList.toggle("hidden",!["gasto","ingreso","meta","deuda","mover"].includes(t));$("mxw").classList.toggle("hidden",t!=="mover");
+  $("mx").innerHTML='<option value="__sin">Sin asignar</option>'+opts(gastoCats());
+  $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):t==="ingreso"?opts(cfg.catI):opts(gastoCats())};
  $("mt").onchange=sel;
  $("ms").onclick=function(){const bt=this;let t=$("mt").value,a=num($("ma").value);if(!(a>0)){$("mmsg").textContent="Escribe un monto válido.";return}
   if(t==="ahorro-"){t="ahorro";a=-a}
   if((t==="meta"||t==="deuda")&&!$("mc").value){$("mmsg").textContent="Primero crea una "+t+" en la pantalla Metas.";return}
-  const row={tipo:t,fecha:$("mf").value,categoria:["gasto","meta","deuda","ingreso"].includes(t)?$("mc").value:null,descripcion:$("md").value.trim(),monto:a};
-  saving(bt,async()=>{const{error}=await sb.from("family_movs").insert(row);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}await load();return true})};
+  const f=$("mf").value,cat=$("mc").value,rows=[];
+  if(t==="mover"){const src=$("mx").value;if(!cat||src===cat){$("mmsg").textContent="Elige sobres distintos.";return}
+   rows.push({tipo:"asig",fecha:f,categoria:cat,descripcion:"desde "+(src==="__sin"?"Sin asignar":src),monto:a});if(src!=="__sin")rows.push({tipo:"asig",fecha:f,categoria:src,descripcion:"hacia "+cat,monto:-a})}
+  else{
+   if(t==="gasto"&&f.slice(0,7)===today().slice(0,7)){const S=sobresData(),e=S.list.find(x=>x.n===cat);
+    if(e&&a>e.bal){const T=takeFrom(a-e.bal,cat,S);
+     if(!confirm("El sobre «"+cat+"» tiene "+money(Math.max(0,e.bal))+" y la compra es de "+money(a)+".\nEl asesor propone tomar: "+(T.steps.map(x=>money(x.amt)+" de "+x.from).join(", ")||"no hay de dónde")+(T.short>0?"\nOjo: aún faltarían "+money(T.short)+" (el sobre quedará en rojo).":"")+"\n¿Aceptas?"))return;
+     T.steps.forEach(x=>{rows.push({tipo:"asig",fecha:f,categoria:cat,descripcion:"desde "+x.from,monto:x.amt});if(!x.sin)rows.push({tipo:"asig",fecha:f,categoria:x.from,descripcion:"hacia "+cat,monto:-x.amt})})}}
+   rows.push({tipo:t,fecha:f,categoria:["gasto","meta","deuda","ingreso"].includes(t)?cat:null,descripcion:$("md").value.trim(),monto:a})}
+  saving(bt,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}await load();return true})};
 }
 const saveCfg=async()=>{const{error}=await sb.from("family_config").upsert({id:1,valores:cfg});if(error)alert("No se pudo guardar: "+error.message);return!error};
 function eta(falta,a){if(falta<=0)return"¡Lograda! 🎉";if(!(a>0))return"Pon un aporte mensual para calcular";const n=Math.ceil(falta/a),d=new Date();d.setMonth(d.getMonth()+n);return"~"+n+" mes(es) · "+d.toLocaleDateString("es",{month:"long",year:"numeric"})}
@@ -289,7 +298,7 @@ function pMet(c){
 }
 function pPla(c){
  const P=proj(c.m),isNow=c.m===today().slice(0,7);
- $("p-pla").innerHTML=`${semanaHtml()}<div class="card"><h2>¿Cuánto vas a ganar este mes?</h2><div class="sub">Solo tu ganancia neta, sin barbería ni ahorro de la barbería.</div><div class="box" style="margin-top:8px"><canvas id="c4"></canvas></div></div>
+ $("p-pla").innerHTML=`${sobresHtml()}<div class="card"><h2>¿Cuánto vas a ganar este mes?</h2><div class="sub">Solo tu ganancia neta, sin barbería ni ahorro de la barbería.</div><div class="box" style="margin-top:8px"><canvas id="c4"></canvas></div></div>
  <div class="card"><div class="row"><div><b>Cierre estimado (neto para ti)</b><div class="sub">${isNow?"Con tus citas ya reservadas y tu ritmo normal":"Este mes ya cerró"}</div></div><b class="ok">${money(isNow?P.end:c.netB)}</b></div>
  <div class="row"><div><b>Llevas ganado</b><div class="sub">Neto hasta hoy</div></div><b>${money(c.netB)}</b></div>
  <div class="row"><div><b>Reservado para lo que falta</b><div class="sub">${P.nF} cliente(s) agendados (bruto)</div></div><b>${money(P.bookedF)}</b></div></div>`;
@@ -297,28 +306,26 @@ function pPla(c){
   {label:"Proyección",data:P.pro,borderColor:"#2563eb",borderDash:[6,5],tension:.3,pointRadius:3}]},options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{callback:v=>money(v)}}}}});
 }
 function pAse(c){
- const tips=[],add=(i,t)=>tips.push(`<div class="tip">${i} ${t}</div>`),fm=c.prom*cfg.fondoMeses,fp=fm?Math.min(100,c.ahorroTot/fm*100):0;
- if(c.pA>0)add("💰","Te faltan "+money(c.pA)+" para tu ahorro del mes ("+cfg.pctA+"%).");else if(c.ingreso)add("✅","Ahorro del mes cumplido.");
- if(c.pM>0&&cfg.metas.length)add("🎯","Aún puedes aportar "+money(c.pM)+" a tus metas este mes.");
- if(c.pD>0)add("🧾","Te faltan "+money(c.pD)+" para tu pago de deudas del mes.");
- if(c.fijoPend>0)add("🏠","Faltan unos "+money(c.fijoPend)+" de gastos fijos: ese dinero ya está comprometido.");
- const top=Object.entries(c.byCat).sort((a,b)=>b[1]-a[1])[0];if(top)add("📊","Tu mayor gasto es <b>"+esc(top[0])+"</b>: "+money(top[1])+".");
- if(c.ritmo>c.ingreso&&c.ingreso>0)add("⚠️","Al ritmo actual gastarías "+money(c.ritmo)+", más de lo que ganas este mes.");
- if(!c.ingreso)add("ℹ️","Aún no hay ingresos este mes.");
- $("p-ase").innerHTML=`<div class="card"><h2>Dinero realmente libre</h2><div class="v ${c.libre>=0?"ok":"bad"}">${money(c.libre)}</div><div class="sub">Ganancia − gastos − fijos pendientes − ahorro, metas y deudas pendientes</div></div>
- <div class="card"><h2>Fondo de emergencia</h2><div class="sub">Meta: ${cfg.fondoMeses} meses de gastos = ${money(fm)}</div><div class="v save">${money(c.ahorroTot)}</div><div class="bar"><i style="width:${fp}%"></i></div></div>
- <div class="card"><h2>¿Puedo comprar algo?</h2><div class="f"><label>Precio</label><input id="pp" type="number" inputmode="decimal"></div>
+ const S=sobresData(),A=asesor(),ic={bad:"🔴",warn:"🟡",ok:"🟢",info:"ℹ️"},fm=c.prom*cfg.fondoMeses,fp=fm?Math.min(100,c.ahorroTot/fm*100):0;
+ $("p-ase").innerHTML=`<div class="card"><h2>Lo que recomienda el asesor</h2>${A.length?A.slice(0,10).map(a=>'<div class="tip">'+ic[a.l]+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Sin recomendaciones por ahora.</div>'}</div>
+ <div class="card"><h2>¿Puedo comprar algo o de dónde tomo?</h2><div class="f"><label>Precio</label><input id="pp" type="number" inputmode="decimal"></div>
+ <div class="f"><label>¿Para qué sobre?</label><select id="pt"><option value="">Gasto no planificado</option>${opts(S.list.map(e=>e.n))}</select></div>
  <div class="f"><label>¿Es necesario?</label><select id="pn"><option value="1">Sí</option><option value="0">Es un gusto</option></select></div><button class="btn" id="pb">Pedir consejo</button><div id="pv"></div></div>
- ${comprasHtml()}<div class="card"><h2>Observaciones</h2>${tips.join("")||'<p class="sub">Sin observaciones.</p>'}</div>`;
- $("pb").onclick=()=>{const p=num($("pp").value),nd=$("pn").value==="1";if(!(p>0))return;let t,cl,x;const ok=c.ahorroTot>=fm;
-  if(p<=c.libre*.5&&(ok||nd)){cl="ok";t="Adelante ✅";x="Cabe cómodo sin tocar ahorro, metas ni fijos."}
-  else if(p<=c.libre){cl="warn";t=nd?"Se puede, con cuidado 🟡":"Mejor espera 🟡";x=nd?"Cabe, pero deja poco margen. Compara precios.":"Cabe, pero es un gusto y deja poco margen. Espera o completa antes el fondo de emergencia."}
-  else if(nd){cl="warn";t="Necesario, pero no alcanza 🟠";x="Te faltarían "+money(p-Math.max(c.libre,0))+". Espera a nuevos ingresos o paga en partes."}
-  else{cl="bad";t="No por ahora ⛔";x="Supera tu dinero libre y no es necesario."}
-  $("pv").innerHTML=`<div class="verdict" style="border-color:var(--${cl})"><b>${t}</b><div class="sub">${x}</div></div>`};
+ <div class="card"><h2>Fondo de emergencia</h2><div class="sub">Meta: ${cfg.fondoMeses} meses de gastos = ${money(fm)}</div><div class="v save">${money(c.ahorroTot)}</div><div class="bar"><i style="width:${fp}%"></i></div></div>`+comprasHtml();
+ $("pb").onclick=()=>{const p=num($("pp").value),to=$("pt").value,nd=$("pn").value==="1";if(!(p>0))return;
+  const e=S.list.find(x=>x.n===to),short=Math.max(0,p-(e?Math.max(0,e.bal):0));let cl,t,x;
+  if(!short){cl="ok";t="Adelante ✅";x="El sobre «"+to+"» ya tiene el dinero."}
+  else{const T=takeFrom(short,to,S),otros=T.steps.some(s=>!s.sin),piso=T.steps.some(s=>s.from.indexOf("piso")>0),txt=T.steps.map(s=>money(s.amt)+" de "+s.from).join(", ");
+   if(T.short>0){cl="bad";t="No alcanza ⛔";x="Aun tomando de todos lados faltarían "+money(T.short)+". "+(nd?"Si es urgente, espera lo que entre hoy.":"Déjalo para después.")}
+   else if(!nd&&(otros||piso)){cl="warn";t="Mejor espera 🟡";x="Es un gusto y habría que tomar "+txt+". Espera a tener dinero libre."}
+   else if(otros||piso){cl="warn";t="Se puede, tomando de otros sobres 🟡";x="Toma "+txt+". Lo próximo que entre rellenará esos sobres por urgencia."}
+   else{cl="ok";t="Adelante ✅";x="Sale de dinero libre sobre el piso: "+txt+"."}}
+  const nx=S.plan.slice(0,3).map(e=>e.n).join(", ");
+  $("pv").innerHTML='<div class="verdict" style="border-color:var(--'+cl+')"><b>'+t+'</b><div class="sub">'+esc(x+(nx&&short?" Lo próximo que entre irá primero a: "+nx+".":""))+'</div></div>'};
 }
 const PR=[["vital","Vital"],["fecha","Con fecha"],["gusto","Gusto"]];
-const crow=(n,f,g,p,b)=>g?'<div class="crow g"><input class="cn" style="grid-column:span 2" value="'+esc(n)+'" placeholder="Nombre"><button class="chip" data-fx>×</button><select class="cp">'+PR.map(x=>'<option value="'+x[0]+'"'+((p||(f?"fecha":"gusto"))===x[0]?" selected":"")+'>'+x[1]+'</option>').join("")+'</select><input class="cb" type="number" inputmode="decimal" placeholder="Monto/mes" value="'+(num(b)||"")+'"><label><input type="checkbox" class="cf"'+(f?" checked":"")+'> fijo</label></div>':'<div class="crow"><input class="cn" value="'+esc(n)+'" placeholder="Nombre"><span></span><button class="chip" data-fx>×</button></div>';
+const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const crow=(n,f,g,p,b,dia,sem)=>g?'<div class="crow g"><input class="cn" style="grid-column:span 2" value="'+esc(n)+'" placeholder="Nombre"><button class="chip" data-fx>×</button><select class="cp">'+PR.map(x=>'<option value="'+x[0]+'"'+((p||(f?"fecha":"gusto"))===x[0]?" selected":"")+'>'+x[1]+'</option>').join("")+'</select><input class="cb" type="number" inputmode="decimal" placeholder="Monto/mes" value="'+(num(b)||"")+'"><label><input type="checkbox" class="cf"'+(f?" checked":"")+'> fijo</label><select class="cd"><option value="">Sin día fijo</option>'+DIAS.map((d,i)=>'<option value="'+i+'"'+(String(dia)===String(i)?" selected":"")+'>'+d+'</option>').join("")+'</select><input class="cs" type="number" inputmode="decimal" placeholder="Monto semanal" value="'+(num(sem)||"")+'"><span></span></div>':'<div class="crow"><input class="cn" value="'+esc(n)+'" placeholder="Nombre"><span></span><button class="chip" data-fx>×</button></div>';
 const D0=()=>cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde:B.start;
 function netFrom(m){if(m<B.start.slice(0,7))return{libre:0,days:{}};const nm=netMonth(m),d0=D0();if(d0<=m+"-01")return nm;const days={};let L=0;Object.keys(nm.days).forEach(k=>{if(k>=d0){days[k]=nm.days[k];L+=nm.days[k]}});return{libre:L,days}}
 const wkS=d=>{const x=parseD(d);x.setDate(x.getDate()-x.getDay());return fmt(x)};
@@ -326,34 +333,80 @@ function cartera(){const d0=cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde
  for(let i=0;i<120;i++){const k=y+"-"+String(mo).padStart(2,"0");if(k>cur)break;const dd=netMonth(k).days;Object.keys(dd).forEach(d=>{if(d>=d0)s+=dd[d]});mo++;if(mo>12){mo=1;y++}}
  const l=movs.filter(x=>String(x.fecha).slice(0,10)>=d0);
  return s+ofTipo(l,"ingreso")-ofTipo(l,"gasto")-ofTipo(l,"ahorro")-ofTipo(l,"deuda")-ofTipo(l,"meta")}
-function semana(){
- const t=today(),c=calc(t.slice(0,7)),dl=c.dim-(+t.slice(8))+1,wl=Math.max(1,Math.ceil(dl/7)),ws=wkS(t),cart=cartera(),piso=num(cfg.piso);
- const gs=movs.filter(x=>x.tipo==="gasto"&&String(x.fecha).slice(0,10)>=ws),fj=fijasC(),sw=f=>sum(gs.filter(f).map(x=>num(x.monto))),spm=n=>c.byCat[n]||0;
- const rows=[],add=(n,p,bud,spent,spw)=>{if(!(bud>0))return;const falta=Math.max(0,bud-spent),T=falta>0?rd10((falta+spw)/wl):0;rows.push({n,p,bud,spent,over:Math.max(0,spent-bud),rest:Math.max(0,Math.min(falta,T-spw))})};
- add("Gastos fijos","fecha",c.fijos,sum(fj.map(spm)),sw(x=>fj.includes(x.categoria)));
- cfg.catG.filter(x=>!x.f&&num(x.b)>0).forEach(x=>add(x.n,x.p||(["Comida","Transporte","Salud"].includes(x.n)?"vital":"gusto"),num(x.b),spm(x.n),sw(y=>y.categoria===x.n)));
- const wm=k=>sum(movs.filter(x=>x.tipo===k&&String(x.fecha).slice(0,10)>=ws).map(x=>num(x.monto)));
- add("Ahorro","meta",c.mA,c.aA,wm("ahorro"));add("Metas","meta",c.mM,c.aM,wm("meta"));if(cfg.deudas.length)add("Deudas","meta",c.mD,c.aD,wm("deuda"));
- const ord={vital:0,fecha:1,meta:2,gusto:3};rows.sort((a,b)=>ord[a.p]-ord[b.p]);
- let asg=0;rows.forEach(r=>{const av=r.p==="vital"?cart-asg:Math.max(0,cart-piso-asg);r.a=Math.max(0,Math.min(r.rest,av));asg+=r.a;r.st=r.rest===0||r.a>=r.rest?"ok":r.a>0?"parcial":"no"});
- return{rows,cart,piso,after:cart-asg,wl,c}}
-function avisos(){const S=semana(),A=[],fr=(+today().slice(8))/S.c.dim;
- if(S.cart<S.piso)A.push({k:"piso",l:"bad",t:"La cartera ("+money(S.cart)+") está bajo el piso ("+money(S.piso)+"). Congela los gustos hasta recuperarlo."});
- S.rows.forEach(r=>{
-  if(r.p!=="meta"){
-   if(r.over>0)A.push({k:"over"+r.n,l:"bad",t:r.n+": te pasaste "+money(r.over)+" del plan del mes."});
-   else if(r.spent/r.bud>=.8&&r.spent/r.bud>fr+.15)A.push({k:"ritmo"+r.n,l:"warn",t:r.n+" lleva "+Math.round(r.spent/r.bud*100)+"% gastado y el mes va por el "+Math.round(fr*100)+"%."})}
-  if((r.p==="vital"||r.p==="fecha")&&r.st==="no")A.push({k:"no"+r.n,l:"bad",t:"Esta semana no alcanza el dinero para "+r.n+" ("+money(r.rest)+")."})});
- return A}
+function netDays(){const all={},cur=today().slice(0,7);let y=+B.start.slice(0,4),mo=+B.start.slice(5,7);for(let i=0;i<120;i++){const k=y+"-"+String(mo).padStart(2,"0");if(k>cur)break;Object.assign(all,netFrom(k).days);mo++;if(mo>12){mo=1;y++}}return all}
+function ritmoSem(){const nd=netDays(),t=today(),cs=wkS(t),wk={};Object.keys(nd).forEach(d=>{const k=wkS(d);wk[k]=(wk[k]||0)+nd[d]});
+ const prev=Object.keys(wk).filter(k=>k<cs).sort().slice(-4),base=prev.length?sum(prev.map(k=>wk[k]))/prev.length:null,cur=wk[cs]||0,wd=Math.max(1,diff(cs,t)+(dow(t)===0?0:0));
+ const proj=cur/wd*6;return{base,proj,cur,good:(base===null||wd<2)?null:proj>=base*.9}}
+function sobresData(){
+ const t=today(),m=t.slice(0,7),c=calc(m),dim=c.dim,eom=m+"-"+String(dim).padStart(2,"0"),list=[];
+ const as=movs.filter(x=>x.tipo==="asig"&&String(x.fecha).slice(0,7)===m),gs=movs.filter(x=>x.tipo==="gasto"&&String(x.fecha).slice(0,7)===m);
+ const mk=(n,p,bud,o)=>{const asg=sum(as.filter(x=>x.categoria===n).map(x=>num(x.monto))),sp=sum(gs.filter(x=>x.categoria===n).map(x=>num(x.monto))),days=Math.max(0,diff(t,o.D)),wl=Math.max(1,Math.ceil((days+1)/7));
+  list.push({n,p,bud,asg,sp,bal:asg-sp,falta:Math.max(0,bud-asg),sem:0,venc:false,...o,days,wl})};
+ fijosOf(m).forEach(x=>{if(num(x.a)>0)mk(x.n,"fecha",num(x.a),{D:x.v?m+"-"+String(Math.min(+x.v,dim)).padStart(2,"0"):eom,venc:!!x.v})});
+ cfg.catG.filter(x=>!x.f&&num(x.b)>0).forEach(x=>{let D=eom,sem=0;if(x.dia!==""&&x.dia!==undefined&&x.dia!==null&&num(x.sem)>0){const d=parseD(t);d.setDate(d.getDate()+(+x.dia-d.getDay()+7)%7);D=fmt(d);sem=num(x.sem)}
+  mk(x.n,x.p||(["Comida","Transporte","Salud"].includes(x.n)?"vital":"gusto"),num(x.b),{D,sem})});
+ list.forEach(e=>{e.need=e.falta<=0?0:e.sem>0?Math.min(e.falta,Math.max(0,e.sem-e.bal)):e.days<=7?e.falta:Math.min(e.falta,rd10(e.falta/e.wl))});
+ const cart=cartera(),piso=num(cfg.piso),sin=cart-sum(list.map(e=>Math.max(0,e.bal))),rank={vital:0,fecha:1,gusto:3};
+ const ord=list.slice().sort((a,b)=>((a.days<=7?0:1)-(b.days<=7?0:1))||rank[a.p]-rank[b.p]||a.D.localeCompare(b.D));
+ let av=sin>0?Math.max(0,sin-piso):0,dip=sin>0?Math.min(sin,piso):0;
+ ord.forEach(e=>{let g=0;if(e.need>0){g=Math.min(e.need,e.p==="vital"?av+dip:av);const fa=Math.min(g,av);av-=fa;dip-=g-fa}e.give=Math.max(0,g)});
+ const oblig=sum(list.map(e=>Math.max(0,e.bud-e.sp)))+c.pA+c.pM+c.pD,nd=netDays(),vals=Object.keys(nd).sort().slice(-24).map(k=>nd[k]).filter(v=>v>0),avg=vals.length?sum(vals)/vals.length:0;
+ let rest=0;try{rest=Math.max(0,proj(m).end-c.netB)}catch(e){}
+ const gap=oblig-cart;
+ return{list,ord,plan:ord.filter(e=>e.need>0),sin,cart,piso,c,m,ritmo:{oblig,cart,projRest:rest,gap,avg,dias:avg>0?Math.ceil(Math.max(0,gap-rest)/avg):null}}}
+/* ¿De dónde tomo dinero? Primero lo libre, luego gustos, luego fijos lejanos, luego vitales con sobrante, al final el piso */
+function takeFrom(amt,to,S){const st=[];let r=amt;
+ const add=(from,x,sin)=>{x=Math.min(r,Math.floor(Math.max(0,x)/10)*10);if(x>0){st.push({from,amt:x,sin});r-=x}};
+ add("Sin asignar",S.sin-S.piso,1);
+ S.list.filter(e=>e.n!==to&&e.bal>0).map(e=>{const res=e.p==="gusto"?0:e.p==="vital"?(e.sem>0?e.sem:rd10(Math.max(0,e.bud-e.sp)/e.wl)):(e.days<=7?Math.max(e.sem||0,e.bud-e.sp):0);return{e,lend:e.bal-res,cls:e.p==="gusto"?0:e.p==="fecha"?1:2}})
+  .sort((a,b)=>a.cls-b.cls||b.e.days-a.e.days).forEach(o=>add(o.e.n,o.lend,0));
+ add("Sin asignar (piso)",Math.min(S.sin,S.piso),1);
+ return{steps:st,short:r}}
+function asesor(){
+ const S=sobresData(),c=S.c,R=S.ritmo,t=today(),dm=+t.slice(8),fr=dm/c.dim,A=[],M=money,add=(k,l,p,x)=>A.push({k,l,p,t:x});
+ const how=T=>T.steps.length?"toma "+T.steps.map(x=>M(x.amt)+" de "+x.from).join(", ")+(T.short>0?" (aún faltarían "+M(T.short)+")":""):"no hay de dónde tomar";
+ if(!S.list.length)add("nosob","info",10,"Todavía no tienes sobres: en Ajustes pon tus gastos fijos y el monto por mes de cada categoría.");
+ if(!cfg.cartDesde)add("cfg","info",9,"En Ajustes → Cartera y avisos, escribe desde qué día cuentas y cuánto dinero tienes en mano.");
+ if(S.sin<0)add("neg","bad",10,"Sin asignar está en negativo ("+M(S.sin)+"): gastaste más de lo disponible. Para cubrirlo "+how(takeFrom(-S.sin,"",S))+".");
+ else if(S.sin<S.piso)add("piso","warn",8,"El dinero sin asignar ("+M(S.sin)+") está bajo el piso ("+M(S.piso)+"). Congela los gustos hasta recuperarlo.");
+ S.list.forEach(e=>{
+  if(e.bal<0)add("rojo"+e.n,"bad",9,"«"+e.n+"» está en rojo ("+M(e.bal)+"). Para cubrirlo "+how(takeFrom(-e.bal,e.n,S))+".");
+  if(e.sp>e.bud)add("over"+e.n,"bad",8,"«"+e.n+"»: te pasaste "+M(e.sp-e.bud)+" de lo planificado del mes.");
+  else if(e.sp/e.bud>=.8&&e.sp/e.bud>fr+.15)add("rit"+e.n,"warn",6,"«"+e.n+"» lleva "+Math.round(e.sp/e.bud*100)+"% gastado y el mes va por el "+Math.round(fr*100)+"%.");
+  else if(dm>=5&&e.p!=="fecha"&&e.sp>0&&e.sp/dm*c.dim>e.bud*1.1)add("pry"+e.n,"warn",5,"Al ritmo actual «"+e.n+"» cerraría el mes en "+M(e.sp/dm*c.dim)+" y su plan es "+M(e.bud)+".");
+  if(e.days<=7&&e.need>0){const dn=e.sem>0?"el "+DIAS[parseD(e.D).getDay()].toLowerCase():"el "+e.D.slice(8)+"/"+e.D.slice(5,7);
+   if(e.give>=e.need)add("urg"+e.n,"ok",6,"«"+e.n+"» necesita "+M(e.need)+" para "+dn+": el reparto de hoy lo cubre.");
+   else add("urg"+e.n,"bad",9,"«"+e.n+"» necesita "+M(e.need)+" para "+dn+" y hoy solo se pueden asignar "+M(e.give)+". Para completar "+how(takeFrom(e.need-e.give,e.n,S))+".")}});
+ if(S.list.length){
+  if(R.gap<=0)add("ritmo","ok",7,"Ya tienes cubierto lo que falta del mes ("+M(R.oblig)+" por gastar o apartar y "+M(R.cart)+" en la cartera). Puedes llevar un ritmo calmado: lo que ganes desde ahora es extra para ahorro o gustos.");
+  else if(R.projRest>=R.gap*1.15)add("ritmo","ok",6,"Vas bien: te faltan "+M(R.gap)+" por cubrir y se espera que ganes unos "+M(R.projRest)+" lo que queda del mes. Ritmo normal.");
+  else if(R.projRest>=R.gap)add("ritmo","warn",7,"Vas justo: te faltan "+M(R.gap)+" y se espera ganar "+M(R.projRest)+". No te sobra margen, evita faltar días de trabajo.");
+  else add("ritmo","warn",9,"Con el ritmo actual faltarían "+M(R.gap-R.projRest)+" para cerrar el mes."+(R.dias?" Necesitas unos "+R.dias+" día(s) buenos más (≈"+M(R.avg)+" por día) o recortar gustos.":""))}
+ const w=ritmoSem();if(w.good===true)add("sem","ok",5,"Esta semana va bien: al ritmo actual cerrarías en "+M(w.proj)+", sobre tu promedio de "+M(w.base)+".");else if(w.good===false)add("sem","warn",7,"Esta semana va floja: cerrarías en "+M(w.proj)+" y tu promedio es "+M(w.base)+". Escríbeles a tus clientes.");
+ compras().forEach(o=>{
+  if(o.left!==null&&o.left<=3)add("cmp"+o.n,"warn",7,"«"+o.n+"» se te acaba en ~"+Math.max(0,o.left)+" día(s) (la compras cada ~"+o.cy+"). Toma el dinero de su sobre o de Sin asignar.");
+  if(o.pc<=-10)add("bar"+o.n,"ok",6,"«"+o.n+"» está "+Math.round(-o.pc)+"% más barata que tu promedio ("+M(o.l)+" contra "+M(o.av)+"): buen momento para adelantar la compra"+(S.sin>S.piso?" (tienes "+M(S.sin-S.piso)+" libres sobre el piso).":"."));
+  else if(o.pc>=10)add("car"+o.n,"warn",4,"«"+o.n+"» está "+Math.round(o.pc)+"% más cara que tu promedio. Si aún te dura, espera.")});
+ const fm=c.prom*cfg.fondoMeses;if(fm>0&&c.ahorroTot<fm*.25)add("fondo","info",5,"Tu fondo de emergencia ("+M(c.ahorroTot)+") está por debajo del 25% de su meta ("+M(fm)+").");
+ if(S.list.length&&R.gap<=0&&c.pA>0)add("ah","info",4,"Ya cubres el mes: puedes apartar "+M(c.pA)+" para ahorro.");
+ if(c.pD>0)add("deu","warn",5,"Te faltan "+M(c.pD)+" para tu pago de deudas del mes.");
+ const top=Object.entries(c.byCat).sort((a,b)=>b[1]-a[1])[0];if(top&&c.gasto>0&&top[1]/c.gasto>.4)add("conc","info",3,"«"+top[0]+"» es el "+Math.round(top[1]/c.gasto*100)+"% de todo lo que gastas este mes.");
+ const nm=S.list.map(e=>e.n),sp=Object.entries(c.byCat).filter(x=>!nm.includes(x[0])&&x[1]>0);if(sp.length)add("sinplan","info",4,"Gastaste "+M(sum(sp.map(x=>x[1])))+" en categorías sin monto planificado ("+sp.map(x=>x[0]).join(", ")+"). Dales un monto por mes en Ajustes.");
+ return A.sort((a,b)=>b.p-a.p)}
+const avisos=()=>asesor().filter(a=>a.l==="bad"||a.l==="warn").slice(0,5);
 async function maybeSend(al){if(!cfg.wa||!CB.bot_url||!CB.mi_numero)return;const t=today(),old=cfg.sent&&cfg.sent.d===t?cfg.sent.k:[],nw=al.filter(a=>a.l==="bad"&&!old.includes(a.k));if(!nw.length)return;
  const txt="💰 Finanzas del hogar\n"+nw.map(a=>"• "+a.t).join("\n"),url=String(CB.bot_url).replace(/\{texto\}/g,encodeURIComponent(txt)).replace(/\{numero\}/g,digits(CB.mi_numero));
  try{await fetch(url,{mode:"no-cors"});cfg.sent={d:t,k:old.concat(nw.map(a=>a.k))};await saveCfg()}catch(e){}}
 function avisosHtml(){const A=avisos();return'<div class="card"><h2>Avisos</h2>'+(A.length?A.map(a=>'<div class="tip">'+(a.l==="bad"?"🔴":"🟡")+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Todo en orden ✅</div>')+'</div>'}
-function carteraHtml(){const S=semana();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.cart-S.piso))+'</div>'+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
-function semanaHtml(){const S=semana(),ic={ok:"✅",parcial:"🟡",no:"⛔"};
- return'<div class="card"><h2>Plan de esta semana</h2><div class="sub">Domingo a sábado · quedan '+S.wl+' semana(s) del mes · cartera '+money(S.cart)+' · piso '+money(S.piso)+'</div><div style="margin-top:6px">'+
- (S.rows.length?S.rows.map(r=>'<div class="row"><div><b>'+esc(r.n)+'</b><div class="sub">Mes: '+money(r.spent)+' de '+money(r.bud)+(r.over?" · pasado "+money(r.over):"")+'</div></div><div style="text-align:right"><b>'+(r.rest?money(r.rest):"—")+'</b><div class="sub">'+(r.rest?ic[r.st]+(r.st==="ok"?" cubierto":r.st==="parcial"?" parcial "+money(r.a):" no alcanza"):"✅ al día")+'</div></div></div>').join(""):'<div class="sub">Pon el monto por mes de cada categoría en Ajustes para ver el plan.</div>')+'</div>'+
- '<div class="sub" style="margin-top:8px">Si gastas todo lo planificado, la cartera quedaría en <b class="'+(S.after>=S.piso?"ok":"bad")+'">'+money(S.after)+'</b>.</div></div>'}
+function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
+const gastoCats=()=>fijosOf(today().slice(0,7)).map(x=>x.n).concat(cfg.catG.filter(x=>!x.f).map(x=>x.n));
+function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slice(5,7),pc=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0,tot=sum(S.list.map(e=>e.give));let cum=0;
+ let h='<div class="card"><h2>Dinero sin asignar</h2><div class="v '+(S.sin<0?"bad":S.sin<S.piso?"warn":"ok")+'">'+money(S.sin)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.sin-S.piso))+' · cartera total '+money(S.cart)+'</div></div>';
+ h+='<div class="card"><h2>Sobres</h2>'+(S.list.length?S.list.map(e=>'<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>'+esc(e.n)+' <span class="sub">'+({vital:"vital",fecha:"con fecha",gusto:"gusto"}[e.p]||"")+'</span></b><b class="'+(e.bal<0?"bad":"")+'">'+money(e.bal)+'</b></div><div class="bar"><i style="width:'+pc(e.sp,e.bud)+'%;background:'+(e.sp>e.bud?"var(--bad)":"var(--save)")+'"></i></div><div class="sub">Gastado '+money(e.sp)+' de '+money(e.bud)+' · falta llenar '+money(e.falta)+(e.need>0?" · necesita "+money(e.need)+" antes del "+sd(e.D):"")+(e.give>0?" → reparto "+money(e.give):"")+'</div></div>').join(""):'<div class="sub">Crea tus sobres en Ajustes: gastos fijos y categorías con monto por mes.</div>')+
+  (tot>0?'<button class="btn" data-rep="1" style="margin-top:10px">Aplicar reparto sugerido ('+money(tot)+')</button>':'')+'</div>';
+ h+='<div class="card"><h2>Plan de relleno</h2><div class="sub">Lo próximo que entre irá en este orden.</div>'+(S.plan.length?S.plan.map(e=>{cum+=e.need;return'<div class="row"><div><b>'+esc(e.n)+'</b><div class="sub">necesita '+money(e.need)+' antes del '+sd(e.D)+'</div></div><div class="sub">acum. '+money(cum)+'</div></div>'}).join(""):'<div class="sub">No hay nada urgente por llenar.</div>')+'</div>';
+ h+='<div class="card"><h2>Este mes</h2><div class="row"><span>Falta por gastar o apartar</span><b>'+money(R.oblig)+'</b></div><div class="row"><span>Tienes en la cartera</span><b>'+money(R.cart)+'</b></div><div class="row"><span>Esperas ganar lo que queda</span><b class="ok">'+money(R.projRest)+'</b></div><div class="row"><span>'+(R.gap<=0?"Te sobra":"Te falta")+'</span><b class="'+(R.gap<=0?"ok":R.projRest>=R.gap?"warn":"bad")+'">'+money(Math.abs(R.gap))+'</b></div></div>';
+ return h}
 function compras(){const g={};movs.filter(x=>x.tipo==="gasto"&&x.descripcion).forEach(x=>{const k=String(x.descripcion).trim().toLowerCase();(g[k]=g[k]||{n:String(x.descripcion).trim(),b:[]}).b.push({f:String(x.fecha).slice(0,10),m:num(x.monto)})});
  return Object.values(g).filter(o=>o.b.length>=2).map(o=>{o.b.sort((a,b)=>a.f.localeCompare(b.f));const l=o.b[o.b.length-1],pr=o.b.slice(0,-1),av=sum(pr.map(x=>x.m))/pr.length,gp=[];
   for(let i=1;i<o.b.length;i++){const d=diff(o.b[i-1].f,o.b[i].f);if(d>0)gp.push(d)}
@@ -362,8 +415,8 @@ function comprasHtml(){const L=compras();if(!L.length)return"";return'<div class
 
 function pAju(c){
  const fj=fijosOf(c.m);
- $("p-aju").innerHTML=`<div class="card"><h2>Gastos fijos de ${esc(c.m)}</h2><div class="sub">Renta, luz, agua, internet… Cada mes puedes cambiarlos: lo que edites aquí vale desde este mes en adelante.</div><div id="fj" style="margin-top:8px">
- ${fj.map(x=>`<div class="two"><input class="fn" value="${esc(x.n)}" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal" value="${num(x.a)}"><button class="chip" data-fx>×</button></div>`).join("")}</div>
+ $("p-aju").innerHTML=`<div class="card"><h2>Gastos fijos de ${esc(c.m)}</h2><div class="sub">Renta, luz, agua, internet… Cada mes puedes cambiarlos: lo que edites aquí vale desde este mes en adelante. Cada gasto fijo es un sobre; la tercera casilla es el día del mes en que vence (opcional).</div><div id="fj" style="margin-top:8px">
+ ${fj.map(x=>`<div class="two"><input class="fn" value="${esc(x.n)}" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal" value="${num(x.a)}"><input class="fv" type="number" inputmode="numeric" placeholder="Día" value="${x.v||""}"><button class="chip" data-fx>×</button></div>`).join("")}</div>
  <button class="chip" data-fadd style="width:100%;margin-bottom:8px">+ Añadir gasto fijo</button><div class="sub">Total: <b>${money(c.fijos)}</b></div></div>
  <div class="card"><h2>¿Cuánto separas de tu ganancia?</h2><div class="sub">Porcentajes de tu ganancia neta de cada día. Todo se redondea a múltiplos de 10.</div>
  <div class="f"><label>% para ahorro</label><input id="pa" type="number" value="${cfg.pctA}"></div>
@@ -375,7 +428,7 @@ function pAju(c){
  <div class="f"><label>Contar la cartera desde el día</label><input id="cd" type="date" value="${cfg.cartDesde||""}"></div>
  <div class="f"><label>Dinero que había en la cartera ese día</label><input id="c0" type="number" value="${num(cfg.cartera0)}"></div>
  <div class="f"><label>Enviar avisos importantes a mi WhatsApp (usa el bot de la barbería)</label><select id="wa"><option value="0">No</option><option value="1"${cfg.wa?" selected":""}>Sí</option></select></div></div>
- <div class="card"><h2>Categorías de gastos</h2><div class="sub">Para cada una: prioridad y monto por mes. «Fijo» = gasto fijo (su monto sale de la lista de gastos fijos de arriba).</div><div id="cg" style="margin-top:8px">${cfg.catG.map(x=>crow(x.n,x.f,1,x.p,x.b)).join("")}</div>
+ <div class="card"><h2>Categorías de gastos</h2><div class="sub">Cada categoría es un sobre: prioridad, monto por mes y, si lo necesitas en un día fijo (ej. mercado el domingo), ese día y el monto semanal. No marques «fijo» aquí: los gastos fijos van en la lista de arriba.</div><div id="cg" style="margin-top:8px">${cfg.catG.map(x=>crow(x.n,x.f,1,x.p,x.b,x.dia,x.sem)).join("")}</div>
  <button class="chip" data-cadd="g" style="width:100%">+ Añadir categoría</button></div>
  <div class="card"><h2>Categorías de ingresos</h2><div class="sub">Para los ingresos que anotes aparte de la barbería.</div><div id="ci" style="margin-top:8px">${cfg.catI.map(x=>crow(x,0,0)).join("")}</div>
  <button class="chip" data-cadd="i" style="width:100%">+ Añadir categoría</button></div>
@@ -400,6 +453,12 @@ const HELP={
 "Dinero realmente libre":"Lo que puedes gastar sin dañar nada: ganancia menos gastos hechos, fijos que faltan y lo que falta por apartar.",
 "Fondo de emergencia":"Ahorro para imprevistos. La meta son varios meses de gastos; la barra muestra cuánto llevan.",
 "¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
+"Dinero sin asignar":"Dinero que tienes pero aún no está dentro de ningún sobre. El piso es lo que siempre debe quedar aquí para compras que aparezcan.",
+"Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día.",
+"Plan de relleno":"El orden en que se llenarán los sobres con el próximo dinero que entre: primero lo más urgente.",
+"Este mes":"Compara lo que falta por gastar o apartar este mes con lo que tienes y lo que se espera que ganes. Así sabes si puedes ir con calma o necesitas trabajar más.",
+"Lo que recomienda el asesor":"El asesor revisa tus sobres, gastos, cartera y ritmo de ganancias. Lo más importante sale primero: 🔴 urgente, 🟡 cuidado, 🟢 bien.",
+"¿Puedo comprar algo o de dónde tomo?":"Escribe el precio y el sobre para el que es. Te digo si alcanza y, si no, de qué otros sobres tomar sin dañar lo urgente.",
 "Cartera":"Todo el dinero que tienen disponible para gastar. Se calcula con lo que ganas, menos lo que gastan y lo que apartan.",
 "Avisos":"Alertas: cartera bajo el piso, categoría que se pasó del plan o que va muy rápido, y dinero que no alcanza esta semana.",
 "Plan de esta semana":"Cuánto gastar esta semana en cada categoría: lo que falta del mes dividido entre las semanas que quedan. Se cubre en orden: vital, con fecha, ahorro y gustos. ✅ alcanza, 🟡 alcanza en parte, ⛔ no alcanza.",
@@ -427,14 +486,16 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now(
 /* ---------- Eventos ---------- */
 document.addEventListener("click",async e=>{
  const t=e.target;let b;
+ if(b=t.closest("[data-rep]")){const S=sobresData(),f=today(),rows=S.list.filter(e=>e.give>0).map(e=>({tipo:"asig",fecha:f,categoria:e.n,descripcion:"reparto",monto:e.give}));if(!rows.length)return;
+  saving(b,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){alert(error.message);return false}await load();return true});return}
  if(b=t.closest("[data-help]")){b.parentNode.nextElementSibling.classList.toggle("hidden");return}
  if(b=t.closest("[data-cadd]")){const g=b.dataset.cadd==="g";$(g?"cg":"ci").insertAdjacentHTML("beforeend",crow("",0,g));return}
  if(b=t.closest("[data-del]")){if(!confirm("¿Borrar este movimiento?"))return;await sb.from("family_movs").delete().eq("id",b.dataset.del);await load();render();return}
  if(b=t.closest("[data-fx]")){b.parentNode.remove();return}
- if(b=t.closest("[data-fadd]")){$("fj").insertAdjacentHTML("beforeend",'<div class="two"><input class="fn" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal"><button class="chip" data-fx>×</button></div>');return}
+ if(b=t.closest("[data-fadd]")){$("fj").insertAdjacentHTML("beforeend",'<div class="two"><input class="fn" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal"><input class="fv" type="number" inputmode="numeric" placeholder="Día"><button class="chip" data-fx>×</button></div>');return}
  if(b=t.closest("[data-save]")){
-  const m=$("mes").value,nf=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value)})).filter(x=>x.n||x.a),
-   cg=[...document.querySelectorAll("#cg .crow")].map(r=>({n:r.querySelector(".cn").value.trim(),f:r.querySelector(".cf").checked?1:0,p:r.querySelector(".cp").value,b:num(r.querySelector(".cb").value)})).filter(x=>x.n),
+  const m=$("mes").value,nf=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value),v:num(r.querySelector(".fv").value)||0})).filter(x=>x.n||x.a),
+   cg=[...document.querySelectorAll("#cg .crow")].map(r=>({n:r.querySelector(".cn").value.trim(),f:r.querySelector(".cf").checked?1:0,p:r.querySelector(".cp").value,b:num(r.querySelector(".cb").value),dia:r.querySelector(".cd").value,sem:num(r.querySelector(".cs").value)})).filter(x=>x.n),
    ci=[...document.querySelectorAll("#ci .crow")].map(r=>r.querySelector(".cn").value.trim()).filter(Boolean),
    pp={pctA:num($("pa").value),pctM:num($("pm").value),pctD:num($("pd").value)};
   if(pp.pctA+pp.pctM+pp.pctD>100){$("am").textContent="Los porcentajes suman más de 100%: bájalos.";return}
