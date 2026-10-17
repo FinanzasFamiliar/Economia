@@ -370,14 +370,16 @@ function sobresData(){
  cfg.catG.filter(x=>!x.f&&num(x.b)>0).forEach(x=>{let D=eom,sem=0;if(x.dia!==""&&x.dia!==undefined&&x.dia!==null&&num(x.sem)>0){const d=parseD(t);d.setDate(d.getDate()+(+x.dia-d.getDay()+7)%7);D=fmt(d);sem=num(x.sem)}
   mk(x.n,x.p||(["Comida","Transporte","Salud"].includes(x.n)?"vital":"gusto"),num(x.b),{D,sem})});
  list.forEach(e=>{e.need=e.falta<=0?0:e.sem>0?Math.min(e.falta,Math.max(0,e.sem-e.bal)):e.days<=7?e.falta:Math.min(e.falta,rd10(e.falta/e.wl))});
- const cart=cartera(),piso=num(cfg.piso),sin=cart-sum(list.map(e=>Math.max(0,e.bal))),rank={vital:0,fecha:1,gusto:3};
- const ord=list.slice().sort((a,b)=>((a.days<=7?0:1)-(b.days<=7?0:1))||rank[a.p]-rank[b.p]||a.D.localeCompare(b.D));
+ const cart=cartera(),piso=num(cfg.piso),sin=cart-sum(list.map(e=>Math.max(0,e.bal))),rank={vital:0,fecha:1,meta:2,gusto:3};
+ const og=cfg.metas.some(g=>num(g.ini)+sum(movs.filter(x=>x.tipo==="meta"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.obj)),od=cfg.deudas.some(g=>sum(movs.filter(x=>x.tipo==="deuda"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.tot)),dE=Math.max(0,diff(t,eom)),wE=Math.max(1,Math.ceil((dE+1)/7)),aps=[];
+ [["Ahorro","ahorro",c.mA,c.aA,c.pA,1],["Metas","meta",c.mM,c.aM,c.pM,og],["Deudas","deuda",c.mD,c.aD,c.pD,od]].forEach(a=>{if(a[5]&&a[4]>0)aps.push({n:a[0],p:"meta",ap:a[1],bud:a[2],sp:a[3],bal:0,falta:a[4],need:dE<=7?a[4]:Math.min(a[4],rd10(a[4]/wE)),D:eom,days:dE,wl:wE,give:0})});
+ const ord=list.concat(aps).sort((a,b)=>((a.days<=7?0:1)-(b.days<=7?0:1))||rank[a.p]-rank[b.p]||a.D.localeCompare(b.D));
  let av=sin>0?Math.max(0,sin-piso):0,dip=sin>0?Math.min(sin,piso):0;
  ord.forEach(e=>{let g=0;if(e.need>0){g=Math.min(e.need,e.p==="vital"?av+dip:av);const fa=Math.min(g,av);av-=fa;dip-=g-fa}e.give=Math.max(0,g)});
  const oblig=sum(list.map(e=>Math.max(0,e.bud-e.sp)))+c.pA+c.pM+c.pD,nd=netDays(),vals=Object.keys(nd).sort().slice(-24).map(k=>nd[k]).filter(v=>v>0),avg=vals.length?sum(vals)/vals.length:0;
  let rest=0;try{rest=Math.max(0,proj(m).end-c.netB)}catch(e){}
  const gap=oblig-cart;
- return{list,ord,plan:ord.filter(e=>e.need>0),sin,cart,piso,c,m,ritmo:{oblig,cart,projRest:rest,gap,avg,dias:avg>0?Math.ceil(Math.max(0,gap-rest)/avg):null}}}
+ return{list,aps,ord,plan:ord.filter(e=>e.need>0),sin,cart,piso,c,m,ritmo:{oblig,cart,projRest:rest,gap,avg,dias:avg>0?Math.ceil(Math.max(0,gap-rest)/avg):null}}}
 /* ¿De dónde tomo dinero? Primero lo libre, luego gustos, luego fijos lejanos, luego vitales con sobrante, al final el piso */
 function takeFrom(amt,to,S){const st=[];let r=amt;
  const add=(from,x,sin)=>{x=Math.min(r,Math.floor(Math.max(0,x)/10)*10);if(x>0){st.push({from,amt:x,sin});r-=x}};
@@ -424,10 +426,11 @@ async function maybeSend(al){if(!cfg.wa||!CB.bot_url||!CB.mi_numero)return;const
 function avisosHtml(){const A=avisos();return'<div class="card"><h2>Avisos</h2>'+(A.length?A.map(a=>'<div class="tip">'+(a.l==="bad"?"🔴":"🟡")+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Todo en orden ✅</div>')+'</div>'}
 function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
 const gastoCats=()=>fijosOf(today().slice(0,7)).map(x=>x.n).concat(cfg.catG.filter(x=>!x.f).map(x=>x.n));
-function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slice(5,7),pc=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0,tot=sum(S.list.map(e=>e.give));let cum=0;
+function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slice(5,7),pc=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0,tot=sum(S.ord.map(e=>e.give));let cum=0;
  let h='<div class="card"><h2>Dinero sin asignar</h2><div class="v '+(S.sin<0?"bad":S.sin<S.piso?"warn":"ok")+'">'+money(S.sin)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.sin-S.piso))+' · cartera total '+money(S.cart)+'</div></div>';
  h+='<div class="card"><h2>Sobres</h2>'+(S.list.length?S.list.map(e=>'<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>'+esc(e.n)+' <span class="sub">'+({vital:"vital",fecha:"con fecha",gusto:"gusto"}[e.p]||"")+'</span></b><b class="'+(e.bal<0?"bad":"")+'">'+money(e.bal)+'</b></div><div class="bar"><i style="width:'+pc(e.sp,e.bud)+'%;background:'+(e.sp>e.bud?"var(--bad)":"var(--save)")+'"></i></div><div class="sub">Gastado '+money(e.sp)+' de '+money(e.bud)+' · falta llenar '+money(e.falta)+(e.need>0?" · necesita "+money(e.need)+" antes del "+sd(e.D):"")+(e.give>0?" → reparto "+money(e.give):"")+'</div></div>').join(""):'<div class="sub">Crea tus sobres en Ajustes: gastos fijos y categorías con monto por mes.</div>')+
   (tot>0?'<button class="btn" data-rep="1" style="margin-top:10px">Aplicar reparto sugerido ('+money(tot)+')</button>':'')+'</div>';
+ if(S.aps.length)h+='<div class="card"><h2>Apartar este mes</h2>'+S.aps.map(e=>'<div class="row"><div><b>'+e.n+'</b><div class="sub">Llevas '+money(e.sp)+' de '+money(e.bud)+' · esta semana '+money(e.need)+'</div></div><b class="save">'+(e.give>0?"→ "+money(e.give):"—")+'</b></div>').join("")+'</div>';
  h+='<div class="card"><h2>Plan de relleno</h2><div class="sub">Lo próximo que entre irá en este orden.</div>'+(S.plan.length?S.plan.map(e=>{cum+=e.need;return'<div class="row"><div><b>'+esc(e.n)+'</b><div class="sub">necesita '+money(e.need)+' antes del '+sd(e.D)+'</div></div><div class="sub">acum. '+money(cum)+'</div></div>'}).join(""):'<div class="sub">No hay nada urgente por llenar.</div>')+'</div>';
  h+='<div class="card"><h2>Este mes</h2><div class="row"><span>Falta por gastar o apartar</span><b>'+money(R.oblig)+'</b></div><div class="row"><span>Tienes en la cartera</span><b>'+money(R.cart)+'</b></div><div class="row"><span>Esperas ganar lo que queda</span><b class="ok">'+money(R.projRest)+'</b></div><div class="row"><span>'+(R.gap<=0?"Te sobra":"Te falta")+'</span><b class="'+(R.gap<=0?"ok":R.projRest>=R.gap?"warn":"bad")+'">'+money(Math.abs(R.gap))+'</b></div></div>';
  return h}
@@ -482,6 +485,7 @@ const HELP={
 "¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
 "Dinero sin asignar":"Dinero que tienes pero aún no está dentro de ningún sobre. El piso es lo que siempre debe quedar aquí para compras que aparezcan.",
 "Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día.",
+"Apartar este mes":"Lo que toca separar del mes para ahorro, metas y deudas según tus porcentajes de Ajustes. Al aplicar el reparto, ese dinero sale de la cartera y queda anotado como ahorro, aporte a meta o pago de deuda.",
 "Plan de relleno":"El orden en que se llenarán los sobres con el próximo dinero que entre: primero lo más urgente.",
 "Este mes":"Compara lo que falta por gastar o apartar este mes con lo que tienes y lo que se espera que ganes. Así sabes si puedes ir con calma o necesitas trabajar más.",
 "Lo que recomienda el asesor":"El asesor revisa tus sobres, gastos, cartera y ritmo de ganancias. Lo más importante sale primero: 🔴 urgente, 🟡 cuidado, 🟢 bien.",
@@ -520,7 +524,12 @@ document.addEventListener("click",async e=>{
   saving(b,async()=>{const a=await sb.from("family_movs").delete().gte("id",0);if(a.error){$("rsm").textContent=a.error.message;return false}
    const c2=await sb.from("family_config").delete().eq("id",1);if(c2.error){$("rsm").textContent=c2.error.message;return false}
    movs=[];cfg=JSON.parse(CFG0);return true});return}
- if(b=t.closest("[data-rep]")){const S=sobresData(),f=today(),rows=S.list.filter(e=>e.give>0).map(e=>({tipo:"asig",fecha:f,categoria:e.n,descripcion:"reparto",monto:e.give}));if(!rows.length)return;
+ if(b=t.closest("[data-rep]")){const S=sobresData(),f=today(),rows=[];S.ord.forEach(e=>{if(!(e.give>0))return;
+  if(!e.ap){rows.push({tipo:"asig",fecha:f,categoria:e.n,descripcion:"reparto",monto:e.give});return}
+  if(e.ap==="ahorro"){rows.push({tipo:"ahorro",fecha:f,categoria:null,descripcion:"reparto",monto:e.give});return}
+  const arr=e.ap==="meta"?cfg.metas.filter(g=>num(g.ini)+sum(movs.filter(x=>x.tipo==="meta"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.obj)):cfg.deudas.filter(g=>sum(movs.filter(x=>x.tipo==="deuda"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.tot)),w=g=>num(g.ap)||num(g.cuota)||1,W=sum(arr.map(w));let left=e.give;
+  arr.forEach((g,i)=>{const v=i===arr.length-1?left:Math.min(left,rd10(e.give*w(g)/W));left-=v;if(v>0)rows.push({tipo:e.ap,fecha:f,categoria:g.id,descripcion:"reparto",monto:v})})});
+  if(!rows.length)return;
   saving(b,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){alert(error.message);return false}await load();return true});return}
  if(b=t.closest("[data-help]")){b.parentNode.nextElementSibling.classList.toggle("hidden");return}
  if(b=t.closest("[data-cadd]")){const g=b.dataset.cadd==="g";$(g?"cg":"ci").insertAdjacentHTML("beforeend",crow("",0,g));const L=$(g?"cg":"ci").lastElementChild;if(g){L.querySelector(".cdet").classList.remove("hidden");L.querySelector("[data-gear]").classList.add("on")}L.querySelector(".cn").focus();return}
