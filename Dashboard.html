@@ -50,6 +50,7 @@ button:active:not(:disabled){transform:translateY(2px) scale(.94);filter:brightn
 @keyframes pl{50%{opacity:.25;transform:scale(1.5)}}
 .crow{display:grid;grid-template-columns:1fr 70px 40px;gap:8px;align-items:center;margin-bottom:8px}
 .crow label{font-size:13px;color:var(--mut);display:flex;gap:5px;align-items:center}.crow input[type=checkbox]{width:20px;height:20px;padding:0}
+.crow.g{grid-template-columns:1fr 1fr auto}
 #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}#login .b{width:100%;max-width:360px}
 </style></head><body>
 
@@ -84,8 +85,8 @@ function passed(f,t){const n=today();if(f<n)return true;if(f>n)return false;cons
 
 const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
 let movs=[],turnos=[],gb=[],CB={},B={},RES=[],_fin={},charts={},tab="res";
-let cfg={pctF:40,pctA:10,pctD:0,pctM:10,fondoMeses:3,fijosPorMes:{},metas:[],deudas:[],
- catG:[{n:"Vivienda",f:1},{n:"Servicios",f:1},{n:"Comida"},{n:"Transporte"},{n:"Salud"},{n:"Hogar"},{n:"Ocio"},{n:"Educación"},{n:"Otros"}],
+let cfg={piso:8000,wa:false,cartera0:0,cartDesde:"",pctF:40,pctA:10,pctD:0,pctM:10,fondoMeses:3,fijosPorMes:{},metas:[],deudas:[],
+ catG:[{n:"Vivienda",f:1},{n:"Servicios",f:1},{n:"Comida",p:"vital"},{n:"Transporte",p:"vital"},{n:"Salud",p:"vital"},{n:"Hogar"},{n:"Ocio"},{n:"Educación"},{n:"Otros"}],
  catI:["Extra","Venta","Regalo","Otros"]};
 $("mes").value=today().slice(0,7);
 
@@ -198,8 +199,8 @@ function hoyHtml(){const a=alloc(today()),r=(t,s,v,c)=>`<div class="row"><div><b
   (cfg.deudas.length?r("Deudas",cfg.pctD+"% de hoy",a.de,"warn"):"")+r("Para ti hoy","lo que queda libre",a.libre,"ok")+'</div></div>'}
 const fijosOf=m=>{const ks=Object.keys(cfg.fijosPorMes).filter(k=>k<=m).sort();return ks.length?cfg.fijosPorMes[ks[ks.length-1]]:[]};
 const ofTipo=(l,t)=>sum(l.filter(x=>x.tipo===t).map(x=>num(x.monto)));
-function calc(){
- const m=$("mes").value||today().slice(0,7),now=today(),[y,mo]=m.split("-").map(Number),dim=new Date(y,mo,0).getDate();
+function calc(mp){
+ const m=mp||$("mes").value||today().slice(0,7),now=today(),[y,mo]=m.split("-").map(Number),dim=new Date(y,mo,0).getDate();
  const day=now.slice(0,7)===m?+now.slice(8):(m<now.slice(0,7)?dim:0);
  const mm=movs.filter(x=>String(x.fecha).slice(0,7)===m),gs=mm.filter(x=>x.tipo==="gasto");
  const nm=m>=B.start.slice(0,7)?netMonth(m):{libre:0,days:{}};
@@ -228,7 +229,7 @@ $("nav").onclick=e=>{const t=e.target.dataset.t;if(!t)return;tab=t;[...$("nav").
  ["res","mov","met","pla","ase","aju"].forEach(x=>$("p-"+x).classList.toggle("hidden",x!==t));render()};
 function render(){
  if($("app").classList.contains("hidden"))return;const c=calc();
- ({res:pRes,mov:pMov,met:pMet,pla:pPla,ase:pAse,aju:pAju})[tab](c);enhance($("p-"+tab));
+ ({res:pRes,mov:pMov,met:pMet,pla:pPla,ase:pAse,aju:pAju})[tab](c);enhance($("p-"+tab));if(tab==="res"){try{maybeSend(avisos())}catch(e){}}
 }
 function pRes(c){
  $("p-res").innerHTML=`<div class="grid">
@@ -236,7 +237,7 @@ function pRes(c){
  <div class="card"><div class="k">Gastos</div><div class="v bad">${money(c.gasto)}</div><div class="sub">Ritmo del mes ${money(c.ritmo)}</div></div>
  <div class="card"><div class="k">Apartado (ahorro, metas, deudas)</div><div class="v save">${money(c.aA+c.aM+c.aD)}</div></div>
  <div class="card"><div class="k">Queda en la mano</div><div class="v ${c.bal>=0?"ok":"bad"}">${money(c.bal)}</div></div></div>
- ${hoyHtml()}<div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
+ ${carteraHtml()}<div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
  <div class="card"><h2>Ingresos y gastos por día</h2><div class="sub">Cada punto es un día</div><div class="box"><canvas id="c2"></canvas></div></div>
  <div class="card"><h2>Reparto del mes</h2><div class="box"><canvas id="c3"></canvas></div></div>`;
  const k=Object.keys(c.byCat);
@@ -287,7 +288,7 @@ function pMet(c){
 }
 function pPla(c){
  const P=proj(c.m),isNow=c.m===today().slice(0,7);
- $("p-pla").innerHTML=`<div class="card"><h2>¿Cuánto vas a ganar este mes?</h2><div class="sub">Solo tu ganancia neta, sin barbería ni ahorro de la barbería.</div><div class="box" style="margin-top:8px"><canvas id="c4"></canvas></div></div>
+ $("p-pla").innerHTML=`${semanaHtml()}<div class="card"><h2>¿Cuánto vas a ganar este mes?</h2><div class="sub">Solo tu ganancia neta, sin barbería ni ahorro de la barbería.</div><div class="box" style="margin-top:8px"><canvas id="c4"></canvas></div></div>
  <div class="card"><div class="row"><div><b>Cierre estimado (neto para ti)</b><div class="sub">${isNow?"Con tus citas ya reservadas y tu ritmo normal":"Este mes ya cerró"}</div></div><b class="ok">${money(isNow?P.end:c.netB)}</b></div>
  <div class="row"><div><b>Llevas ganado</b><div class="sub">Neto hasta hoy</div></div><b>${money(c.netB)}</b></div>
  <div class="row"><div><b>Reservado para lo que falta</b><div class="sub">${P.nF} cliente(s) agendados (bruto)</div></div><b>${money(P.bookedF)}</b></div></div>`;
@@ -307,7 +308,7 @@ function pAse(c){
  <div class="card"><h2>Fondo de emergencia</h2><div class="sub">Meta: ${cfg.fondoMeses} meses de gastos = ${money(fm)}</div><div class="v save">${money(c.ahorroTot)}</div><div class="bar"><i style="width:${fp}%"></i></div></div>
  <div class="card"><h2>¿Puedo comprar algo?</h2><div class="f"><label>Precio</label><input id="pp" type="number" inputmode="decimal"></div>
  <div class="f"><label>¿Es necesario?</label><select id="pn"><option value="1">Sí</option><option value="0">Es un gusto</option></select></div><button class="btn" id="pb">Pedir consejo</button><div id="pv"></div></div>
- <div class="card"><h2>Observaciones</h2>${tips.join("")||'<p class="sub">Sin observaciones.</p>'}</div>`;
+ ${comprasHtml()}<div class="card"><h2>Observaciones</h2>${tips.join("")||'<p class="sub">Sin observaciones.</p>'}</div>`;
  $("pb").onclick=()=>{const p=num($("pp").value),nd=$("pn").value==="1";if(!(p>0))return;let t,cl,x;const ok=c.ahorroTot>=fm;
   if(p<=c.libre*.5&&(ok||nd)){cl="ok";t="Adelante ✅";x="Cabe cómodo sin tocar ahorro, metas ni fijos."}
   else if(p<=c.libre){cl="warn";t=nd?"Se puede, con cuidado 🟡":"Mejor espera 🟡";x=nd?"Cabe, pero deja poco margen. Compara precios.":"Cabe, pero es un gusto y deja poco margen. Espera o completa antes el fondo de emergencia."}
@@ -315,19 +316,63 @@ function pAse(c){
   else{cl="bad";t="No por ahora ⛔";x="Supera tu dinero libre y no es necesario."}
   $("pv").innerHTML=`<div class="verdict" style="border-color:var(--${cl})"><b>${t}</b><div class="sub">${x}</div></div>`};
 }
-const crow=(n,f,g)=>'<div class="crow"><input class="cn" value="'+esc(n)+'" placeholder="Nombre">'+(g?'<label><input type="checkbox" class="cf"'+(f?" checked":"")+'> fijo</label>':'<span></span>')+'<button class="chip" data-fx>×</button></div>';
+const PR=[["vital","Vital"],["fecha","Con fecha"],["gusto","Gusto"]];
+const crow=(n,f,g,p,b)=>g?'<div class="crow g"><input class="cn" style="grid-column:span 2" value="'+esc(n)+'" placeholder="Nombre"><button class="chip" data-fx>×</button><select class="cp">'+PR.map(x=>'<option value="'+x[0]+'"'+((p||(f?"fecha":"gusto"))===x[0]?" selected":"")+'>'+x[1]+'</option>').join("")+'</select><input class="cb" type="number" inputmode="decimal" placeholder="Monto/mes" value="'+(num(b)||"")+'"><label><input type="checkbox" class="cf"'+(f?" checked":"")+'> fijo</label></div>':'<div class="crow"><input class="cn" value="'+esc(n)+'" placeholder="Nombre"><span></span><button class="chip" data-fx>×</button></div>';
+const wkS=d=>{const x=parseD(d);x.setDate(x.getDate()-x.getDay());return fmt(x)};
+function cartera(){const d0=cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde:B.start,cur=today().slice(0,7);let y=+d0.slice(0,4),mo=+d0.slice(5,7),s=num(cfg.cartera0);
+ for(let i=0;i<120;i++){const k=y+"-"+String(mo).padStart(2,"0");if(k>cur)break;const dd=netMonth(k).days;Object.keys(dd).forEach(d=>{if(d>=d0)s+=dd[d]});mo++;if(mo>12){mo=1;y++}}
+ const l=movs.filter(x=>String(x.fecha).slice(0,10)>=d0);
+ return s+ofTipo(l,"ingreso")-ofTipo(l,"gasto")-ofTipo(l,"ahorro")-ofTipo(l,"deuda")-ofTipo(l,"meta")}
+function semana(){
+ const t=today(),c=calc(t.slice(0,7)),dl=c.dim-(+t.slice(8))+1,wl=Math.max(1,Math.ceil(dl/7)),ws=wkS(t),cart=cartera(),piso=num(cfg.piso);
+ const gs=movs.filter(x=>x.tipo==="gasto"&&String(x.fecha).slice(0,10)>=ws),fj=fijasC(),sw=f=>sum(gs.filter(f).map(x=>num(x.monto))),spm=n=>c.byCat[n]||0;
+ const rows=[],add=(n,p,bud,spent,spw)=>{if(!(bud>0))return;const falta=Math.max(0,bud-spent),T=falta>0?rd10((falta+spw)/wl):0;rows.push({n,p,bud,spent,over:Math.max(0,spent-bud),rest:Math.max(0,Math.min(falta,T-spw))})};
+ add("Gastos fijos","fecha",c.fijos,sum(fj.map(spm)),sw(x=>fj.includes(x.categoria)));
+ cfg.catG.filter(x=>!x.f&&num(x.b)>0).forEach(x=>add(x.n,x.p||(["Comida","Transporte","Salud"].includes(x.n)?"vital":"gusto"),num(x.b),spm(x.n),sw(y=>y.categoria===x.n)));
+ const wm=k=>sum(movs.filter(x=>x.tipo===k&&String(x.fecha).slice(0,10)>=ws).map(x=>num(x.monto)));
+ add("Ahorro","meta",c.mA,c.aA,wm("ahorro"));add("Metas","meta",c.mM,c.aM,wm("meta"));if(cfg.deudas.length)add("Deudas","meta",c.mD,c.aD,wm("deuda"));
+ const ord={vital:0,fecha:1,meta:2,gusto:3};rows.sort((a,b)=>ord[a.p]-ord[b.p]);
+ let asg=0;rows.forEach(r=>{const av=r.p==="vital"?cart-asg:Math.max(0,cart-piso-asg);r.a=Math.max(0,Math.min(r.rest,av));asg+=r.a;r.st=r.rest===0||r.a>=r.rest?"ok":r.a>0?"parcial":"no"});
+ return{rows,cart,piso,after:cart-asg,wl,c}}
+function avisos(){const S=semana(),A=[],fr=(+today().slice(8))/S.c.dim;
+ if(S.cart<S.piso)A.push({k:"piso",l:"bad",t:"La cartera ("+money(S.cart)+") está bajo el piso ("+money(S.piso)+"). Congela los gustos hasta recuperarlo."});
+ S.rows.forEach(r=>{
+  if(r.p!=="meta"){
+   if(r.over>0)A.push({k:"over"+r.n,l:"bad",t:r.n+": te pasaste "+money(r.over)+" del plan del mes."});
+   else if(r.spent/r.bud>=.8&&r.spent/r.bud>fr+.15)A.push({k:"ritmo"+r.n,l:"warn",t:r.n+" lleva "+Math.round(r.spent/r.bud*100)+"% gastado y el mes va por el "+Math.round(fr*100)+"%."})}
+  if((r.p==="vital"||r.p==="fecha")&&r.st==="no")A.push({k:"no"+r.n,l:"bad",t:"Esta semana no alcanza el dinero para "+r.n+" ("+money(r.rest)+")."})});
+ return A}
+async function maybeSend(al){if(!cfg.wa||!CB.bot_url||!CB.mi_numero)return;const t=today(),old=cfg.sent&&cfg.sent.d===t?cfg.sent.k:[],nw=al.filter(a=>a.l==="bad"&&!old.includes(a.k));if(!nw.length)return;
+ const txt="💰 Finanzas del hogar\n"+nw.map(a=>"• "+a.t).join("\n"),url=String(CB.bot_url).replace(/\{texto\}/g,encodeURIComponent(txt)).replace(/\{numero\}/g,digits(CB.mi_numero));
+ try{await fetch(url,{mode:"no-cors"});cfg.sent={d:t,k:old.concat(nw.map(a=>a.k))};await saveCfg()}catch(e){}}
+function avisosHtml(){const A=avisos();return'<div class="card"><h2>Avisos</h2>'+(A.length?A.map(a=>'<div class="tip">'+(a.l==="bad"?"🔴":"🟡")+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Todo en orden ✅</div>')+'</div>'}
+function carteraHtml(){const S=semana();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.cart-S.piso))+'</div>'+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
+function semanaHtml(){const S=semana(),ic={ok:"✅",parcial:"🟡",no:"⛔"};
+ return'<div class="card"><h2>Plan de esta semana</h2><div class="sub">Domingo a sábado · quedan '+S.wl+' semana(s) del mes · cartera '+money(S.cart)+' · piso '+money(S.piso)+'</div><div style="margin-top:6px">'+
+ (S.rows.length?S.rows.map(r=>'<div class="row"><div><b>'+esc(r.n)+'</b><div class="sub">Mes: '+money(r.spent)+' de '+money(r.bud)+(r.over?" · pasado "+money(r.over):"")+'</div></div><div style="text-align:right"><b>'+(r.rest?money(r.rest):"—")+'</b><div class="sub">'+(r.rest?ic[r.st]+(r.st==="ok"?" cubierto":r.st==="parcial"?" parcial "+money(r.a):" no alcanza"):"✅ al día")+'</div></div></div>').join(""):'<div class="sub">Pon el monto por mes de cada categoría en Ajustes para ver el plan.</div>')+'</div>'+
+ '<div class="sub" style="margin-top:8px">Si gastas todo lo planificado, la cartera quedaría en <b class="'+(S.after>=S.piso?"ok":"bad")+'">'+money(S.after)+'</b>.</div></div>'}
+function compras(){const g={};movs.filter(x=>x.tipo==="gasto"&&x.descripcion).forEach(x=>{const k=String(x.descripcion).trim().toLowerCase();(g[k]=g[k]||{n:String(x.descripcion).trim(),b:[]}).b.push({f:String(x.fecha).slice(0,10),m:num(x.monto)})});
+ return Object.values(g).filter(o=>o.b.length>=2).map(o=>{o.b.sort((a,b)=>a.f.localeCompare(b.f));const l=o.b[o.b.length-1],pr=o.b.slice(0,-1),av=sum(pr.map(x=>x.m))/pr.length,gp=[];
+  for(let i=1;i<o.b.length;i++){const d=diff(o.b[i-1].f,o.b[i].f);if(d>0)gp.push(d)}
+  const cy=gp.length?Math.round(sum(gp.slice(-3))/Math.min(3,gp.length)):0;return{n:o.n,l:l.m,av,pc:av?(l.m/av-1)*100:0,cy,left:cy?cy-diff(l.f,today()):null}})}
+function comprasHtml(){const L=compras();if(!L.length)return"";return'<div class="card"><h2>Tus compras repetidas</h2>'+L.map(o=>'<div class="row"><div><b>'+esc(o.n)+'</b><div class="sub">Última '+money(o.l)+' · antes '+money(o.av)+(Math.abs(o.pc)>=10?(o.pc>0?" · 🔺 más cara "+Math.round(o.pc)+"%":" · 🟢 más barata "+Math.round(-o.pc)+"%"):"")+(o.cy?" · la repites cada ~"+o.cy+" días"+(o.left!==null?(o.left<=0?" · ya te toca":" · en ~"+o.left+" días"):""):"")+'</div></div></div>').join("")+'</div>'}
+
 function pAju(c){
  const fj=fijosOf(c.m);
  $("p-aju").innerHTML=`<div class="card"><h2>Gastos fijos de ${esc(c.m)}</h2><div class="sub">Renta, luz, agua, internet… Cada mes puedes cambiarlos: lo que edites aquí vale desde este mes en adelante.</div><div id="fj" style="margin-top:8px">
  ${fj.map(x=>`<div class="two"><input class="fn" value="${esc(x.n)}" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal" value="${num(x.a)}"><button class="chip" data-fx>×</button></div>`).join("")}</div>
  <button class="chip" data-fadd style="width:100%;margin-bottom:8px">+ Añadir gasto fijo</button><div class="sub">Total: <b>${money(c.fijos)}</b></div></div>
  <div class="card"><h2>¿Cuánto separas de tu ganancia?</h2><div class="sub">Porcentajes de tu ganancia neta de cada día. Todo se redondea a múltiplos de 10.</div>
- <div class="f"><label>% para gastos fijos (se reparte entre cada uno)</label><input id="pfx" type="number" value="${cfg.pctF}"></div>
  <div class="f"><label>% para ahorro</label><input id="pa" type="number" value="${cfg.pctA}"></div>
  <div class="f"><label>% para metas</label><input id="pm" type="number" value="${cfg.pctM}"></div>
  <div class="f"><label>% para pagar deudas</label><input id="pd" type="number" value="${cfg.pctD}"></div>
  <div class="f"><label>Fondo de emergencia: meses de gastos</label><input id="pf" type="number" value="${cfg.fondoMeses}"></div></div>
- <div class="card"><h2>Categorías de gastos</h2><div class="sub">Marca «fijo» las que son gastos fijos (renta, luz…).</div><div id="cg" style="margin-top:8px">${cfg.catG.map(x=>crow(x.n,x.f,1)).join("")}</div>
+ <div class="card"><h2>Cartera y avisos</h2>
+ <div class="f"><label>Piso: dinero que siempre debe quedar en la cartera</label><input id="pi" type="number" value="${num(cfg.piso)}"></div>
+ <div class="f"><label>Contar la cartera desde el día</label><input id="cd" type="date" value="${cfg.cartDesde||""}"></div>
+ <div class="f"><label>Dinero que había en la cartera ese día</label><input id="c0" type="number" value="${num(cfg.cartera0)}"></div>
+ <div class="f"><label>Enviar avisos importantes a mi WhatsApp (usa el bot de la barbería)</label><select id="wa"><option value="0">No</option><option value="1"${cfg.wa?" selected":""}>Sí</option></select></div></div>
+ <div class="card"><h2>Categorías de gastos</h2><div class="sub">Para cada una: prioridad y monto por mes. «Fijo» = gasto fijo (su monto sale de la lista de gastos fijos de arriba).</div><div id="cg" style="margin-top:8px">${cfg.catG.map(x=>crow(x.n,x.f,1,x.p,x.b)).join("")}</div>
  <button class="chip" data-cadd="g" style="width:100%">+ Añadir categoría</button></div>
  <div class="card"><h2>Categorías de ingresos</h2><div class="sub">Para los ingresos que anotes aparte de la barbería.</div><div id="ci" style="margin-top:8px">${cfg.catI.map(x=>crow(x,0,0)).join("")}</div>
  <button class="chip" data-cadd="i" style="width:100%">+ Añadir categoría</button></div>
@@ -352,9 +397,14 @@ const HELP={
 "Dinero realmente libre":"Lo que puedes gastar sin dañar nada: ganancia menos gastos hechos, fijos que faltan y lo que falta por apartar.",
 "Fondo de emergencia":"Ahorro para imprevistos. La meta son varios meses de gastos; la barra muestra cuánto llevan.",
 "¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
+"Cartera":"Todo el dinero que tienen disponible para gastar. Se calcula con lo que ganas, menos lo que gastan y lo que apartan.",
+"Avisos":"Alertas: cartera bajo el piso, categoría que se pasó del plan o que va muy rápido, y dinero que no alcanza esta semana.",
+"Plan de esta semana":"Cuánto gastar esta semana en cada categoría: lo que falta del mes dividido entre las semanas que quedan. Se cubre en orden: vital, con fecha, ahorro y gustos. ✅ alcanza, 🟡 alcanza en parte, ⛔ no alcanza.",
+"Tus compras repetidas":"Productos que anotaste más de una vez con el mismo nombre. Te digo si la última compra salió más cara o barata y cada cuánto la repites.",
+"Cartera y avisos":"El piso es el dinero que siempre se deja guardado para poder comprar cuando aparece algo. La fecha y el saldo sirven para empezar a contar la cartera desde cero.",
 "Observaciones":"Avisos automáticos sobre cómo va el mes.",
-"Gastos fijos de*":"Los gastos que se repiten cada mes. Se reparten cada día desde tu ganancia hasta cubrirlos.",
-"¿Cuánto separas":"Qué porcentaje de cada ganancia diaria va a cada cosa. Si suman más de 100% no te deja guardar.",
+"Gastos fijos de*":"Los gastos que se repiten cada mes. Su total es el presupuesto de «Gastos fijos» en el plan semanal.",
+"¿Cuánto separas":"Qué porcentaje de tu ganancia del mes va a ahorro, metas y deudas. Si suman más de 100% no te deja guardar.",
 "Categorías de gastos":"Los tipos de gasto que verás al anotar. Puedes crear, renombrar o borrar. «Fijo» significa que cuenta como gasto fijo pagado.",
 "Categorías de ingresos":"Los tipos de ingreso extra (aparte de la barbería) que verás al anotar."};
 function enhance(root){root.querySelectorAll("h2,.k").forEach(n=>{if(n.dataset.h)return;const t=n.textContent.trim();
@@ -381,11 +431,11 @@ document.addEventListener("click",async e=>{
  if(b=t.closest("[data-fadd]")){$("fj").insertAdjacentHTML("beforeend",'<div class="two"><input class="fn" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal"><button class="chip" data-fx>×</button></div>');return}
  if(b=t.closest("[data-save]")){
   const m=$("mes").value,nf=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value)})).filter(x=>x.n||x.a),
-   cg=[...document.querySelectorAll("#cg .crow")].map(r=>({n:r.querySelector(".cn").value.trim(),f:r.querySelector(".cf").checked?1:0})).filter(x=>x.n),
+   cg=[...document.querySelectorAll("#cg .crow")].map(r=>({n:r.querySelector(".cn").value.trim(),f:r.querySelector(".cf").checked?1:0,p:r.querySelector(".cp").value,b:num(r.querySelector(".cb").value)})).filter(x=>x.n),
    ci=[...document.querySelectorAll("#ci .crow")].map(r=>r.querySelector(".cn").value.trim()).filter(Boolean),
-   pp={pctF:num($("pfx").value),pctA:num($("pa").value),pctM:num($("pm").value),pctD:num($("pd").value)};
-  if(pp.pctF+pp.pctA+pp.pctM+pp.pctD>100){$("am").textContent="Los porcentajes suman más de 100%: bájalos.";return}
-  $("am").textContent="";saving(b,async()=>{cfg.fijosPorMes[m]=nf;Object.assign(cfg,pp,{catG:cg,catI:ci,fondoMeses:num($("pf").value)||3});return await saveCfg()});return}
+   pp={pctA:num($("pa").value),pctM:num($("pm").value),pctD:num($("pd").value)};
+  if(pp.pctA+pp.pctM+pp.pctD>100){$("am").textContent="Los porcentajes suman más de 100%: bájalos.";return}
+  $("am").textContent="";saving(b,async()=>{cfg.fijosPorMes[m]=nf;Object.assign(cfg,pp,{catG:cg,catI:ci,fondoMeses:num($("pf").value)||3,piso:num($("pi").value),cartera0:num($("c0").value),cartDesde:$("cd").value,wa:$("wa").value==="1"});return await saveCfg()});return}
  if(b=t.closest("[data-add]")){let it,k;
   if(b.dataset.add==="meta"){const n=$("gn").value.trim(),o=num($("go").value);if(!n||!(o>0)){alert("Escribe nombre y precio.");return}k="metas";it={id:"m"+Date.now(),n,obj:o,ap:num($("ga").value),ini:num($("gi").value)}}
   else{const n=$("dn").value.trim(),o=num($("dt").value);if(!n||!(o>0)){alert("Escribe nombre y total.");return}k="deudas";it={id:"d"+Date.now(),n,tot:o,cuota:num($("dc").value)}}
