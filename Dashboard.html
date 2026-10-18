@@ -7,8 +7,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#14213d;--mut:#6b7280;--line:#e5e7eb;--ok:#16a34a;--bad:#dc2626;--save:#2563eb;--warn:#d97706}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171e2e;--ink:#eef1f7;--mut:#9aa4b8;--line:#263047}}
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14213d;--mut:#6b7280;--line:#e5e7eb;--ok:#16a34a;--bad:#dc2626;--save:#2563eb;--warn:#d97706;--inc:#6f9a3c;--exp:#800020;--trf:#1f6f8b}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171e2e;--ink:#eef1f7;--mut:#9aa4b8;--line:#263047;--inc:#a3c76d;--exp:#d4506b;--trf:#4fb0d6}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:78px}
 .hidden{display:none!important}
@@ -60,6 +60,9 @@ button:active:not(:disabled){transform:translateY(2px) scale(.94);filter:brightn
 button:disabled{opacity:.4}
 .btn.danger{background:var(--bad);color:#fff}
 #movl{overscroll-behavior:contain;padding-right:6px}
+.inc{color:var(--inc)}.exp{color:var(--exp)}.trf{color:var(--trf)}
+.mv{border-left:4px solid var(--c);padding-left:10px;--c:var(--mut)}.mv b{color:var(--c)}
+.mv-inc{--c:var(--inc)}.mv-exp{--c:var(--exp)}.mv-trf{--c:var(--trf)}.mv-sav{--c:var(--save)}
 #login{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px}#login .b{width:100%;max-width:360px}
 </style></head><body>
 
@@ -231,6 +234,8 @@ function calc(mp){
  return{m,dim,day,mm,netB:nm.libre,ingMan,ingreso,gasto,fijos,fijoPend,aA,aD,aM,mA,mD,mM,pA,pD,pM,libre,bal,byCat,dI,dG,prom,
   ahorroTot:ofTipo(movs,"ahorro"),ritmo:day?gasto/day*dim:0};
 }
+const FB={inc:"#6f9a3c",exp:"#800020",trf:"#1f6f8b"};
+const CC=n=>{try{return getComputedStyle(document.documentElement).getPropertyValue("--"+n).trim()||FB[n]}catch(e){return FB[n]}};
 const col=["#2563eb","#16a34a","#d97706","#dc2626","#7c3aed","#0891b2","#db2777","#65a30d","#64748b"];
 const chart=(id,c)=>{if(charts[id])charts[id].destroy();const e=$(id);if(e)charts[id]=new Chart(e,c)};
 
@@ -249,8 +254,8 @@ function render(){
 }
 function pRes(c){
  $("p-res").innerHTML=`<div class="grid">
- <div class="card"><div class="k">Tu ganancia neta (barbería)</div><div class="v ok">${money(c.netB)}</div><div class="sub">+ extras ${money(c.ingMan)}</div></div>
- <div class="card"><div class="k">Gastos</div><div class="v bad">${money(c.gasto)}</div><div class="sub">Ritmo del mes ${money(c.ritmo)}</div></div>
+ <div class="card"><div class="k">Tu ganancia neta (barbería)</div><div class="v inc">${money(c.netB)}</div><div class="sub">+ extras ${money(c.ingMan)}</div></div>
+ <div class="card"><div class="k">Gastos</div><div class="v exp">${money(c.gasto)}</div><div class="sub">Ritmo del mes ${money(c.ritmo)}</div></div>
  <div class="card"><div class="k">Apartado (ahorro, metas, deudas)</div><div class="v save">${money(c.aA+c.aM+c.aD)}</div></div>
  <div class="card"><div class="k">Queda en la mano</div><div class="v ${c.bal>=0?"ok":"bad"}">${money(c.bal)}</div></div></div>
  ${carteraHtml()}<div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
@@ -259,8 +264,8 @@ function pRes(c){
  const k=Object.keys(c.byCat);
  chart("c1",{type:"doughnut",data:{labels:k.length?k:["Sin gastos"],datasets:[{data:k.length?k.map(x=>c.byCat[x]):[1],backgroundColor:k.length?col:["#cbd5e1"],borderWidth:0}]},options:{maintainAspectRatio:false,cutout:"62%",plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
  const pt=o=>Object.keys(o).map(d=>({x:+d.slice(8),y:o[d]}));
- chart("c2",{type:"scatter",data:{datasets:[{label:"Ingresos",data:pt(c.dI),backgroundColor:"#16a34a",pointRadius:6},{label:"Gastos",data:pt(c.dG),backgroundColor:"#dc2626",pointRadius:6}]},options:{maintainAspectRatio:false,scales:{x:{min:1,max:c.dim}}}});
- chart("c3",{type:"pie",data:{labels:["Gastos","Ahorro","Metas","Deudas","Queda"],datasets:[{data:[c.gasto,c.aA,c.aM,c.aD,Math.max(0,c.bal)],backgroundColor:["#dc2626","#2563eb","#7c3aed","#d97706","#16a34a"],borderWidth:0}]},options:{maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
+ chart("c2",{type:"scatter",data:{datasets:[{label:"Ingresos",data:pt(c.dI),backgroundColor:CC("inc"),pointRadius:6},{label:"Gastos",data:pt(c.dG),backgroundColor:CC("exp"),pointRadius:6}]},options:{maintainAspectRatio:false,scales:{x:{min:1,max:c.dim}}}});
+ chart("c3",{type:"pie",data:{labels:["Gastos","Ahorro","Metas","Deudas","Queda"],datasets:[{data:[c.gasto,c.aA,c.aM,c.aD,Math.max(0,c.bal)],backgroundColor:[CC("exp"),"#2563eb","#7c3aed","#d97706","#16a34a"],borderWidth:0}]},options:{maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
 }
 const opts=a=>a.map(x=>`<option value="${esc(x.id||x)}">${esc(x.n||x)}</option>`).join("");
 function pMov(c){
@@ -271,7 +276,7 @@ function pMov(c){
  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
  <button class="btn" id="ms">Guardar</button><p id="mmsg" class="bad"></p></div>
- <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.id-a.id)).map(x=>`<div class="row"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${x.tipo==="asig"?"transferencia · "+esc(x.categoria):esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
+ <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.id-a.id)).map(x=>`<div class="row mv mv-${x.tipo==="ingreso"?"inc":x.tipo==="gasto"?"exp":x.tipo==="asig"?"trf":"sav"}"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${x.tipo==="asig"?"transferencia · "+esc(x.categoria):esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
  <div style="text-align:right"><b>${money(x.monto)}</b><br><button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
  fitMov();
  const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría / sobre":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":t==="mover"?"Transferir a (sobre)":"—";
@@ -315,11 +320,11 @@ function pMet(c){
 function pPla(c){
  const P=proj(c.m),isNow=c.m===today().slice(0,7);
  $("p-pla").innerHTML=`${sobresHtml()}<div class="card"><h2>¿Cuánto vas a ganar este mes?</h2><div class="sub">Solo tu ganancia neta, sin barbería ni ahorro de la barbería.</div><div class="box" style="margin-top:8px"><canvas id="c4"></canvas></div></div>
- <div class="card"><div class="row"><div><b>Cierre estimado (neto para ti)</b><div class="sub">${isNow?"Con tus citas ya reservadas y tu ritmo normal":"Este mes ya cerró"}</div></div><b class="ok">${money(isNow?P.end:c.netB)}</b></div>
+ <div class="card"><div class="row"><div><b>Cierre estimado (neto para ti)</b><div class="sub">${isNow?"Con tus citas ya reservadas y tu ritmo normal":"Este mes ya cerró"}</div></div><b class="inc">${money(isNow?P.end:c.netB)}</b></div>
  <div class="row"><div><b>Llevas ganado</b><div class="sub">Neto hasta hoy</div></div><b>${money(c.netB)}</b></div>
  <div class="row"><div><b>Reservado para lo que falta</b><div class="sub">${P.nF} cliente(s) agendados (bruto)</div></div><b>${money(P.bookedF)}</b></div></div>`;
- chart("c4",{type:"line",data:{labels:P.labels,datasets:[{label:"Ganado",data:P.act,borderColor:"#16a34a",backgroundColor:"#16a34a24",fill:true,tension:.3,pointRadius:3},
-  {label:"Proyección",data:P.pro,borderColor:"#2563eb",borderDash:[6,5],tension:.3,pointRadius:3}]},options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{callback:v=>money(v)}}}}});
+ chart("c4",{type:"line",data:{labels:P.labels,datasets:[{label:"Ganado",data:P.act,borderColor:CC("inc"),backgroundColor:CC("inc")+"24",fill:true,tension:.3,pointRadius:3},
+  {label:"Proyección",data:P.pro,borderColor:CC("inc"),borderDash:[6,5],tension:.3,pointRadius:3}]},options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{callback:v=>money(v)}}}}});
 }
 function consejo(S,p,to,nd,nm){
  let auto="";const q=nm.toLowerCase();
@@ -344,6 +349,7 @@ function pAse(c){
  $("pb").onclick=()=>{const p=num($("pp").value);if(!(p>0))return;const r=consejo(S,p,$("pt").value,$("pn").value==="1",$("pw").value.trim());
   $("pv").innerHTML='<div class="verdict" style="border-color:var(--'+r.cl+')"><b>'+r.t+'</b><div class="sub">'+esc(r.x)+'</div></div>'};
 }
+const prOpts=v=>[["vital","Vital"],["fecha","Con fecha"],["meta","Normal"],["gusto","Gusto"]].map(x=>'<option value="'+x[0]+'"'+((v||"meta")===x[0]?" selected":"")+'>'+x[1]+'</option>').join("");
 const PR=[["vital","Vital"],["fecha","Con fecha"],["gusto","Gusto"]];
 const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 const mvb='<button class="chip" data-mv="-1" aria-label="Subir">▲</button><button class="chip" data-mv="1" aria-label="Bajar">▼</button>';
@@ -377,10 +383,14 @@ function sobresData(){
  list.forEach(e=>{e.need=e.falta<=0?0:e.sem>0?Math.min(e.falta,Math.max(0,e.sem-e.bal)):e.days<=7?e.falta:Math.min(e.falta,rd10(e.falta/e.wl))});
  const cart=cartera(),piso=num(cfg.piso),sin=cart-sum(list.map(e=>Math.max(0,e.bal))),rank={vital:0,fecha:1,meta:2,gusto:3};
  const og=cfg.metas.some(g=>num(g.ini)+sum(movs.filter(x=>x.tipo==="meta"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.obj)),od=cfg.deudas.some(g=>sum(movs.filter(x=>x.tipo==="deuda"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.tot)),dE=Math.max(0,diff(t,eom)),wE=Math.max(1,Math.ceil((dE+1)/7)),aps=[];
- [["Ahorro","ahorro",c.mA,c.aA,c.pA,1],["Metas","meta",c.mM,c.aM,c.pM,og],["Deudas","deuda",c.mD,c.aD,c.pD,od]].forEach(a=>{if(a[5]&&a[4]>0)aps.push({n:a[0],p:"meta",ap:a[1],bud:a[2],sp:a[3],bal:0,falta:a[4],need:dE<=7?a[4]:Math.min(a[4],rd10(a[4]/wE)),D:eom,days:dE,wl:wE,give:0})});
+ [["Ahorro","ahorro",c.mA,c.aA,c.pA,1,cfg.pAh],["Metas","meta",c.mM,c.aM,c.pM,og,cfg.pMe],["Deudas","deuda",c.mD,c.aD,c.pD,od,cfg.pDe]].forEach(a=>{if(a[5]&&a[4]>0)aps.push({n:a[0],p:a[6]||"meta",ap:a[1],bud:a[2],sp:a[3],bal:0,falta:a[4],need:dE<=7?a[4]:Math.min(a[4],rd10(a[4]/wE)),D:eom,days:dE,wl:wE,give:0})});
  const ord=list.concat(aps).sort((a,b)=>((a.days<=7?0:1)-(b.days<=7?0:1))||rank[a.p]-rank[b.p]||a.D.localeCompare(b.D));
  let av=sin>0?Math.max(0,sin-piso):0;
- ord.forEach(e=>{const g=e.need>0?Math.min(e.need,av):0;av-=g;e.give=Math.max(0,g)});
+ const fr={vital:.5,fecha:.35,meta:.25,gusto:.15},fl=e=>e.need>0?Math.min(e.need,Math.max(10,rd10(e.need*(fr[e.p]||.25)))):0,F=sum(ord.map(fl));
+ ord.forEach(e=>{e.give=0});
+ if(F<=av){ord.forEach(e=>{e.give=fl(e)});av-=F}
+ else if(av>0){let left=av;ord.forEach(e=>{const m=fl(e);if(m>0&&left>0){const g=Math.min(left,Math.max(10,Math.floor(m*av/F/10)*10));e.give=g;left-=g}});av=left}
+ ord.forEach(e=>{if(e.need>e.give&&av>0){const g=Math.min(e.need-e.give,av);e.give+=g;av-=g}});
  const oblig=sum(list.map(e=>Math.max(0,e.bud-e.sp)))+c.pA+c.pM+c.pD,nd=netDays(),vals=Object.keys(nd).sort().slice(-24).map(k=>nd[k]).filter(v=>v>0),avg=vals.length?sum(vals)/vals.length:0;
  let rest=0;try{rest=Math.max(0,proj(m).end-c.netB)}catch(e){}
  const gap=oblig-cart,repF=movs.filter(x=>x.tipo==="asig"&&x.descripcion==="reparto"&&String(x.fecha).slice(0,10)>=wkS(t)).map(x=>String(x.fecha).slice(0,10)).sort().pop()||"";
@@ -439,7 +449,7 @@ function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slic
   (tot>0&&!S.repHecho?'<button class="btn" data-rep="1" style="margin-top:10px">'+(S.esDom?"Aplicar reparto de la semana":"Aplicar reparto de la semana (pendiente)")+' ('+money(tot)+')</button><div class="sub" style="margin-top:6px">El reparto nunca toca el piso: quedarían '+money(S.sin-tot)+' sin asignar.</div>':'<div class="sub" style="margin-top:10px">'+nb+'</div>')+'</div>';
  if(S.aps.length)h+='<div class="card"><h2>Apartar este mes</h2>'+S.aps.map(e=>'<div class="row"><div><b>'+e.n+'</b><div class="sub">Llevas '+money(e.sp)+' de '+money(e.bud)+' · esta semana '+money(e.need)+(e.give>0?"":" · sin dinero libre por ahora (primero van lo vital y lo que vence)")+'</div></div><b class="save">'+(e.give>0?"→ "+money(e.give):"—")+'</b></div>').join("")+'</div>';
  h+='<div class="card"><h2>Plan de relleno</h2><div class="sub">Lo próximo que entre irá en este orden.</div>'+(S.plan.length?S.plan.map(e=>{cum+=e.need;return'<div class="row"><div><b>'+esc(e.n)+'</b><div class="sub">necesita '+money(e.need)+' antes del '+sd(e.D)+'</div></div><div class="sub">acum. '+money(cum)+'</div></div>'}).join(""):'<div class="sub">No hay nada urgente por llenar.</div>')+'</div>';
- h+='<div class="card"><h2>Este mes</h2><div class="row"><span>Falta por gastar o apartar</span><b>'+money(R.oblig)+'</b></div><div class="row"><span>Tienes en la cartera</span><b>'+money(R.cart)+'</b></div><div class="row"><span>Esperas ganar lo que queda</span><b class="ok">'+money(R.projRest)+'</b></div><div class="row"><span>'+(R.gap<=0?"Te sobra":"Te falta")+'</span><b class="'+(R.gap<=0?"ok":R.projRest>=R.gap?"warn":"bad")+'">'+money(Math.abs(R.gap))+'</b></div></div>';
+ h+='<div class="card"><h2>Este mes</h2><div class="row"><span>Falta por gastar o apartar</span><b>'+money(R.oblig)+'</b></div><div class="row"><span>Tienes en la cartera</span><b>'+money(R.cart)+'</b></div><div class="row"><span>Esperas ganar lo que queda</span><b class="inc">'+money(R.projRest)+'</b></div><div class="row"><span>'+(R.gap<=0?"Te sobra":"Te falta")+'</span><b class="'+(R.gap<=0?"ok":R.projRest>=R.gap?"warn":"bad")+'">'+money(Math.abs(R.gap))+'</b></div></div>';
  return h}
 function compras(){const g={};movs.filter(x=>x.tipo==="gasto"&&x.descripcion).forEach(x=>{const k=String(x.descripcion).trim().toLowerCase();(g[k]=g[k]||{n:String(x.descripcion).trim(),b:[]}).b.push({f:String(x.fecha).slice(0,10),m:num(x.monto)})});
  return Object.values(g).filter(o=>o.b.length>=2).map(o=>{o.b.sort((a,b)=>a.f.localeCompare(b.f));const l=o.b[o.b.length-1],pr=o.b.slice(0,-1),av=sum(pr.map(x=>x.m))/pr.length,gp=[];
@@ -453,9 +463,9 @@ function pAju(c){
  ${fj.map(x=>`<div class="two"><input class="fn" value="${esc(x.n)}" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal" value="${num(x.a)}"><input class="fv" type="number" inputmode="numeric" placeholder="Día" value="${x.v||""}"><button class="chip" data-fx>×</button></div>`).join("")}</div>
  <button class="chip" data-fadd style="width:100%;margin-bottom:8px">+ Añadir gasto fijo</button><div class="sub">Total: <b>${money(c.fijos)}</b></div></div>
  <div class="card"><h2>¿Cuánto separas de tu ganancia?</h2><div class="sub">Porcentajes de tu ganancia neta de cada día. Todo se redondea a múltiplos de 10.</div>
- <div class="f"><label>% para ahorro</label><input id="pa" type="number" value="${cfg.pctA}"></div>
- <div class="f"><label>% para metas</label><input id="pm" type="number" value="${cfg.pctM}"></div>
- <div class="f"><label>% para pagar deudas</label><input id="pd" type="number" value="${cfg.pctD}"></div>
+ <div class="f"><label>% para ahorro</label><input id="pa" type="number" value="${cfg.pctA}"></div><div class="f"><label>Prioridad del ahorro</label><select id="paA">${prOpts(cfg.pAh)}</select></div>
+ <div class="f"><label>% para metas</label><input id="pm" type="number" value="${cfg.pctM}"></div><div class="f"><label>Prioridad de las metas</label><select id="paM">${prOpts(cfg.pMe)}</select></div>
+ <div class="f"><label>% para pagar deudas</label><input id="pd" type="number" value="${cfg.pctD}"></div><div class="f"><label>Prioridad de las deudas</label><select id="paD">${prOpts(cfg.pDe)}</select></div>
  <div class="f"><label>Fondo de emergencia: meses de gastos</label><input id="pf" type="number" value="${cfg.fondoMeses}"></div></div>
  <div class="card"><h2>Cartera y avisos</h2>
  <div class="f"><label>Piso: dinero que siempre debe quedar en la cartera</label><input id="pi" type="number" value="${num(cfg.piso)}"></div>
@@ -481,7 +491,7 @@ const HELP={
 "Ingresos y gastos por día":"Cada punto verde es lo que ganaste ese día y cada punto rojo lo que gastaste. Sirve para ver en qué días entra o sale más dinero.",
 "Reparto del mes":"Del dinero del mes, qué parte se fue en gastos, ahorro, metas, deudas y cuánto queda.",
 "Añadir movimiento":"Aquí anotas gastos, ingresos extra, ahorro y aportes a metas o deudas. Los gastos fijos págalos aquí con una categoría marcada «fijo».",
-"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido. Puedes borrar lo que se anotó mal.",
+"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido. Puedes borrar lo que se anotó mal. Verde matcha = ingresos, rojo borgoña = gastos, azul mar = transferencias, azul = ahorro, metas y deudas.",
 "Metas":"Cosas que quieren comprar o lograr. El tiempo se calcula dividiendo lo que falta entre el aporte mensual que le asignaste.",
 "Nueva meta":"Pon el nombre, cuánto cuesta y cuánto le aportarás cada mes. Con eso la web calcula en qué mes la completan.",
 "Deudas":"Lo que deben. La web calcula cuándo terminan según la cuota mensual. El % de deudas solo se aparta si hay alguna anotada.",
@@ -491,7 +501,7 @@ const HELP={
 "Fondo de emergencia":"Ahorro para imprevistos. La meta son varios meses de gastos; la barra muestra cuánto llevan.",
 "¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
 "Dinero sin asignar":"Dinero que tienes pero aún no está dentro de ningún sobre. El piso es lo que siempre debe quedar aquí para compras que aparezcan.",
-"Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día. El reparto se aplica una vez por semana (domingo) y nunca baja del piso.",
+"Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día. El reparto se aplica una vez por semana (domingo), nunca baja del piso y ningún sobre se queda en cero: primero cada uno recibe una parte mínima (mayor si es más prioritario) y luego se completa por prioridad.",
 "Apartar este mes":"Lo que toca separar del mes para ahorro, metas y deudas según tus porcentajes de Ajustes, sobre la ganancia del mes y el dinero con el que empezaste ese mes. Al aplicar el reparto, ese dinero sale de la cartera y queda anotado como ahorro, aporte a meta o pago de deuda.",
 "Plan de relleno":"El orden en que se llenarán los sobres con el próximo dinero que entre: primero lo más urgente.",
 "Este mes":"Compara lo que falta por gastar o apartar este mes con lo que tienes y lo que se espera que ganes. Así sabes si puedes ir con calma o necesitas trabajar más.",
@@ -552,7 +562,7 @@ document.addEventListener("click",async e=>{
   const m=$("mes").value,nf=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value),v:num(r.querySelector(".fv").value)||0})).filter(x=>x.n||x.a),
    cg=[...document.querySelectorAll("#cg .crow")].map(r=>({n:r.querySelector(".cn").value.trim(),f:r.querySelector(".cf").checked?1:0,p:r.querySelector(".cp").value,b:num(r.querySelector(".cb").value),dia:r.querySelector(".cd").value,sem:num(r.querySelector(".cs").value)})).filter(x=>x.n),
    ci=[...document.querySelectorAll("#ci .crow")].map(r=>r.querySelector(".cn").value.trim()).filter(Boolean),
-   pp={pctA:num($("pa").value),pctM:num($("pm").value),pctD:num($("pd").value)};
+   pp={pAh:$("paA").value,pMe:$("paM").value,pDe:$("paD").value,pctA:num($("pa").value),pctM:num($("pm").value),pctD:num($("pd").value)};
   if(pp.pctA+pp.pctM+pp.pctD>100){$("am").textContent="Los porcentajes suman más de 100%: bájalos.";return}
   $("am").textContent="";saving(b,async()=>{cfg.fijosPorMes[m]=nf;Object.assign(cfg,pp,{catG:cg,catI:ci,fondoMeses:num($("pf").value)||3,piso:num($("pi").value),cartera0:num($("c0").value),cartDesde:$("cd").value,wa:$("wa").value==="1"});return await saveCfg()});return}
  if(b=t.closest("[data-add]")){let it,k;
