@@ -321,23 +321,28 @@ function pPla(c){
  chart("c4",{type:"line",data:{labels:P.labels,datasets:[{label:"Ganado",data:P.act,borderColor:"#16a34a",backgroundColor:"#16a34a24",fill:true,tension:.3,pointRadius:3},
   {label:"Proyección",data:P.pro,borderColor:"#2563eb",borderDash:[6,5],tension:.3,pointRadius:3}]},options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{callback:v=>money(v)}}}}});
 }
+function consejo(S,p,to,nd,nm){
+ let auto="";const q=nm.toLowerCase();
+ if(!to&&q){const h=movs.filter(x=>x.tipo==="gasto"&&String(x.descripcion||"").trim().toLowerCase()===q&&S.list.some(e=>e.n===x.categoria)).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))[0];if(h){to=h.categoria;auto=" (lo reconocí por tus compras anteriores)"}}
+ const e=S.list.find(x=>x.n===to),have=e?Math.max(0,e.bal):0,short=Math.max(0,p-have);let cl,t,x;
+ const head=e?"El sobre «"+to+"»"+auto+" tiene "+money(have)+" dentro y la compra es de "+money(p)+": "+(short?"faltan "+money(short)+".":"alcanza con lo que ya tiene.")+(have===0&&e.need>0?" Ojo: dice $0 porque aún no le aplicaste el reparto en Sobres.":""):"No elegiste un sobre, así que cuento todo el precio ("+money(p)+") como dinero de otros sobres.";
+ if(!short){cl="ok";t="Adelante ✅";x=""}
+ else{const T=S?takeFrom(short,to,S):{steps:[],short},otros=T.steps.some(s=>!s.sin),piso=T.steps.some(s=>s.from.indexOf("piso")>0),txt=T.steps.map(s=>money(s.amt)+" de "+s.from).join(", ");
+  if(T.short>0){cl="bad";t="No alcanza ⛔";x="Aun tomando de todos lados faltarían "+money(T.short)+". "+(nd?"Si es urgente, espera lo que entre hoy.":"Déjalo para después.")}
+  else if(!nd&&(otros||piso)){cl="warn";t="Mejor espera 🟡";x="Es un gusto y habría que tomar "+txt+" (total "+money(short)+"). Espera a tener dinero libre."}
+  else if(otros||piso){cl="warn";t="Se puede, tomando de otros sobres 🟡";x="Toma "+txt+" (total "+money(short)+"). Lo próximo que entre rellenará esos sobres por urgencia."}
+  else{cl="ok";t="Adelante ✅";x="Sale de dinero libre sobre el piso: "+txt+" (total "+money(short)+")."}}
+ const nx=S.plan.slice(0,3).map(e=>e.n).join(", ");
+ return{cl,t,x:head+" "+x+(nx&&short?" Lo próximo que entre irá primero a: "+nx+".":""),short}}
 function pAse(c){
  const S=sobresData(),A=asesor(),ic={bad:"🔴",warn:"🟡",ok:"🟢",info:"ℹ️"},fm=c.prom*cfg.fondoMeses,fp=fm?Math.min(100,c.ahorroTot/fm*100):0;
  $("p-ase").innerHTML=`<div class="card"><h2>Lo que recomienda el asesor</h2>${A.length?A.slice(0,10).map(a=>'<div class="tip">'+ic[a.l]+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Sin recomendaciones por ahora.</div>'}</div>
  <div class="card"><h2>¿Puedo comprar algo o de dónde tomo?</h2><div class="f"><label>Precio</label><input id="pp" type="number" inputmode="decimal"></div>
- <div class="f"><label>¿Para qué sobre?</label><select id="pt"><option value="">Gasto no planificado</option>${opts(S.list.map(e=>e.n))}</select></div>
+ <div class="f"><label>¿Qué vas a comprar? (opcional)</label><input id="pw" placeholder="Ej. Shampoo"></div><div class="f"><label>¿Para qué sobre?</label><select id="pt"><option value="">Gasto no planificado</option>${opts(S.list.map(e=>e.n))}</select></div>
  <div class="f"><label>¿Es necesario?</label><select id="pn"><option value="1">Sí</option><option value="0">Es un gusto</option></select></div><button class="btn" id="pb">Pedir consejo</button><div id="pv"></div></div>
  <div class="card"><h2>Fondo de emergencia</h2><div class="sub">Meta: ${cfg.fondoMeses} meses de gastos = ${money(fm)}</div><div class="v save">${money(c.ahorroTot)}</div><div class="bar"><i style="width:${fp}%"></i></div></div>`+comprasHtml();
- $("pb").onclick=()=>{const p=num($("pp").value),to=$("pt").value,nd=$("pn").value==="1";if(!(p>0))return;
-  const e=S.list.find(x=>x.n===to),short=Math.max(0,p-(e?Math.max(0,e.bal):0));let cl,t,x;
-  if(!short){cl="ok";t="Adelante ✅";x="El sobre «"+to+"» ya tiene el dinero."}
-  else{const T=takeFrom(short,to,S),otros=T.steps.some(s=>!s.sin),piso=T.steps.some(s=>s.from.indexOf("piso")>0),txt=T.steps.map(s=>money(s.amt)+" de "+s.from).join(", ");
-   if(T.short>0){cl="bad";t="No alcanza ⛔";x="Aun tomando de todos lados faltarían "+money(T.short)+". "+(nd?"Si es urgente, espera lo que entre hoy.":"Déjalo para después.")}
-   else if(!nd&&(otros||piso)){cl="warn";t="Mejor espera 🟡";x="Es un gusto y habría que tomar "+txt+". Espera a tener dinero libre."}
-   else if(otros||piso){cl="warn";t="Se puede, tomando de otros sobres 🟡";x="Toma "+txt+". Lo próximo que entre rellenará esos sobres por urgencia."}
-   else{cl="ok";t="Adelante ✅";x="Sale de dinero libre sobre el piso: "+txt+"."}}
-  const nx=S.plan.slice(0,3).map(e=>e.n).join(", ");
-  $("pv").innerHTML='<div class="verdict" style="border-color:var(--'+cl+')"><b>'+t+'</b><div class="sub">'+esc(x+(nx&&short?" Lo próximo que entre irá primero a: "+nx+".":""))+'</div></div>'};
+ $("pb").onclick=()=>{const p=num($("pp").value);if(!(p>0))return;const r=consejo(S,p,$("pt").value,$("pn").value==="1",$("pw").value.trim());
+  $("pv").innerHTML='<div class="verdict" style="border-color:var(--'+r.cl+')"><b>'+r.t+'</b><div class="sub">'+esc(r.x)+'</div></div>'};
 }
 const PR=[["vital","Vital"],["fecha","Con fecha"],["gusto","Gusto"]];
 const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -427,9 +432,10 @@ function avisosHtml(){const A=avisos();return'<div class="card"><h2>Avisos</h2>'
 function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
 const gastoCats=()=>fijosOf(today().slice(0,7)).map(x=>x.n).concat(cfg.catG.filter(x=>!x.f).map(x=>x.n));
 function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slice(5,7),pc=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0,tot=sum(S.ord.map(e=>e.give));let cum=0;
+ const nb=(S.sin<=S.piso?"No hay botón de reparto porque no hay dinero libre sobre el piso: tienes "+money(S.sin)+" sin asignar y el piso es "+money(S.piso)+". ":"")+(S.c.ingreso<=0?"El ahorro, las metas y las deudas se calculan sobre la ganancia del mes y todavía no hay ganancia registrada, por eso no aparece «Apartar este mes». ":"")+(S.sin>S.piso&&S.c.ingreso>0?"No hay nada que repartir ahora. ":"")+"Para ahorrar ya, anota en Gastos el tipo «Ahorro: meter dinero».";
  let h='<div class="card"><h2>Dinero sin asignar</h2><div class="v '+(S.sin<0?"bad":S.sin<S.piso?"warn":"ok")+'">'+money(S.sin)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.sin-S.piso))+' · cartera total '+money(S.cart)+'</div></div>';
  h+='<div class="card"><h2>Sobres</h2>'+(S.list.length?S.list.map(e=>'<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>'+esc(e.n)+' <span class="sub">'+({vital:"vital",fecha:"con fecha",gusto:"gusto"}[e.p]||"")+'</span></b><b class="'+(e.bal<0?"bad":"")+'">'+money(e.bal)+'</b></div><div class="bar"><i style="width:'+pc(e.sp,e.bud)+'%;background:'+(e.sp>e.bud?"var(--bad)":"var(--save)")+'"></i></div><div class="sub">Gastado '+money(e.sp)+' de '+money(e.bud)+' · falta llenar '+money(e.falta)+(e.need>0?" · necesita "+money(e.need)+" antes del "+sd(e.D):"")+(e.give>0?" → reparto "+money(e.give):"")+'</div></div>').join(""):'<div class="sub">Crea tus sobres en Ajustes: gastos fijos y categorías con monto por mes.</div>')+
-  (tot>0?'<button class="btn" data-rep="1" style="margin-top:10px">Aplicar reparto sugerido ('+money(tot)+')</button>':'')+'</div>';
+  (tot>0?'<button class="btn" data-rep="1" style="margin-top:10px">Aplicar reparto sugerido ('+money(tot)+')</button>':'<div class="sub" style="margin-top:10px">'+nb+'</div>')+'</div>';
  if(S.aps.length)h+='<div class="card"><h2>Apartar este mes</h2>'+S.aps.map(e=>'<div class="row"><div><b>'+e.n+'</b><div class="sub">Llevas '+money(e.sp)+' de '+money(e.bud)+' · esta semana '+money(e.need)+'</div></div><b class="save">'+(e.give>0?"→ "+money(e.give):"—")+'</b></div>').join("")+'</div>';
  h+='<div class="card"><h2>Plan de relleno</h2><div class="sub">Lo próximo que entre irá en este orden.</div>'+(S.plan.length?S.plan.map(e=>{cum+=e.need;return'<div class="row"><div><b>'+esc(e.n)+'</b><div class="sub">necesita '+money(e.need)+' antes del '+sd(e.D)+'</div></div><div class="sub">acum. '+money(cum)+'</div></div>'}).join(""):'<div class="sub">No hay nada urgente por llenar.</div>')+'</div>';
  h+='<div class="card"><h2>Este mes</h2><div class="row"><span>Falta por gastar o apartar</span><b>'+money(R.oblig)+'</b></div><div class="row"><span>Tienes en la cartera</span><b>'+money(R.cart)+'</b></div><div class="row"><span>Esperas ganar lo que queda</span><b class="ok">'+money(R.projRest)+'</b></div><div class="row"><span>'+(R.gap<=0?"Te sobra":"Te falta")+'</span><b class="'+(R.gap<=0?"ok":R.projRest>=R.gap?"warn":"bad")+'">'+money(Math.abs(R.gap))+'</b></div></div>';
@@ -511,8 +517,9 @@ async function saving(btn,fn){const old=btn.textContent;btn.disabled=true;btn.cl
  let ok=false;try{ok=await fn()}catch(e){alert(e.message||e)}
  btn.classList.remove("busy");btn.textContent=ok?"¡Guardado ✓!":"No se guardó";if(ok)btn.classList.add("done");live(ok?"ok":"bad",ok?"Guardado ✓":"Error al guardar");
  setTimeout(()=>{btn.textContent=old;btn.classList.remove("done");btn.disabled=false;live("idle");if(ok)render()},1200)}
-async function refresh(){if(document.hidden||$("app").classList.contains("hidden")||liveKind==="save")return;await load();
- if(["res","pla","ase"].includes(tab)&&!document.activeElement.matches("input,select,textarea"))render()}
+let lastAct=Date.now();["click","input","touchstart","keydown","scroll"].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},{passive:true,capture:true}));
+const busyUI=()=>Date.now()-lastAct<120000||!!document.querySelector(".help:not(.hidden)")||!!($("pv")&&$("pv").innerHTML.trim())||document.activeElement.matches("input,select,textarea");
+async function refresh(){if(document.hidden||$("app").classList.contains("hidden")||liveKind==="save")return;await load();if(["res","pla","ase"].includes(tab)&&!busyUI())render()}
 setInterval(refresh,60000);setInterval(()=>{if(liveKind==="idle")live("idle")},5000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-lastOk>60000)refresh()});
 /* ---------- Eventos ---------- */
