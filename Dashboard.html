@@ -30,7 +30,7 @@ h2{font-size:16px;margin:0 0 6px}.box{height:230px;position:relative}
 .f{margin-bottom:10px}.f label{display:block;font-size:13px;color:var(--mut);margin-bottom:3px}
 .two{display:grid;grid-template-columns:1fr 90px 58px 40px;gap:8px;margin-bottom:8px}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:4px 2px calc(env(safe-area-inset-bottom) + 4px)}
-nav button{flex:1;border:0;background:none;color:var(--mut);font-size:11.5px;padding:9px 1px}
+nav button{flex:1;border:0;background:none;color:var(--mut);font-size:10.5px;padding:9px 0;white-space:nowrap}
 nav button.on{color:var(--ink);font-weight:700;border-top:2px solid var(--ink)}
 .verdict{border-left:5px solid var(--mut);padding:12px 14px;border-radius:8px;background:var(--bg);margin-top:12px}
 .bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--save)}
@@ -60,6 +60,7 @@ button:active:not(:disabled){transform:translateY(2px) scale(.94);filter:brightn
 button:disabled{opacity:.4}
 .btn.danger{background:var(--bad);color:#fff}
 #movl{overscroll-behavior:contain;padding-right:6px}
+.two2{display:grid;grid-template-columns:1fr 110px 40px;gap:8px;margin-bottom:8px}
 .inc{color:var(--inc)}.exp{color:var(--exp)}.trf{color:var(--trf)}
 .mv{border-left:4px solid var(--c);padding-left:10px;--c:var(--mut)}.mv b{color:var(--c)}
 .mv-inc{--c:var(--inc)}.mv-exp{--c:var(--exp)}.mv-trf{--c:var(--trf)}.mv-sav{--c:var(--save)}
@@ -77,7 +78,7 @@ button:disabled{opacity:.4}
 <header><div class="hr"><h1>Finanzas del Hogar</h1><button class="chip" id="out">Salir</button></div><div class="hr" style="justify-content:center;gap:14px;margin-top:6px"><button class="chip" id="mp" aria-label="Mes anterior">‹</button><b id="ml" style="min-width:140px;text-align:center"></b><button class="chip" id="mn" aria-label="Mes siguiente">›</button><input type="month" id="mes" class="hidden"></div></header>
 <main><div id="err"></div>
 <div id="p-res"></div><div id="p-mov" class="hidden"></div><div id="p-met" class="hidden"></div><div id="p-pla" class="hidden"></div><div id="p-ase" class="hidden"></div><div id="p-aju" class="hidden"></div></main>
-<nav id="nav"><button data-t="res" class="on">Resumen</button><button data-t="mov">Gastos</button><button data-t="met">Metas</button><button data-t="pla">Sobres</button><button data-t="ase">Asesor</button><button data-t="aju">Ajustes</button></nav>
+<nav id="nav"><button data-t="res" class="on">Resumen</button><button data-t="mov">Movimientos</button><button data-t="met">Metas</button><button data-t="pla">Sobres</button><button data-t="ase">Asesor</button><button data-t="aju">Ajustes</button></nav>
 </section>
 
 <script>
@@ -86,6 +87,7 @@ const catsG=()=>cfg.catG.map(x=>x.n),fijasC=()=>cfg.catG.filter(x=>x.f).map(x=>x
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const num=v=>{const n=Number(String(v??"").replace(",","."));return Number.isFinite(n)?n:0};
+const moneyX=v=>{const n=Math.round((v||0)*100)/100;return(n<0?"-$":"$")+Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:2})};
 const money=v=>{const r=rd10(v||0);return(r<0?"-$":"$")+Math.abs(r).toLocaleString("en-US")};
 const sum=a=>a.reduce((s,x)=>s+x,0), digits=s=>String(s??"").replace(/\D/g,"");
 const fmt=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -99,7 +101,7 @@ const sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,a
 let movs=[],turnos=[],gb=[],CB={},B={},RES=[],_fin={},charts={},tab="res";
 let cfg={piso:8000,wa:false,cartera0:0,cartDesde:"",pctF:40,pctA:10,pctD:0,pctM:10,fondoMeses:3,fijosPorMes:{},metas:[],deudas:[],
  catG:[{n:"Vivienda",f:1},{n:"Servicios",f:1},{n:"Comida",p:"vital"},{n:"Transporte",p:"vital"},{n:"Salud",p:"vital"},{n:"Hogar"},{n:"Ocio"},{n:"Educación"},{n:"Otros"}],
- catI:["Extra","Venta","Regalo","Otros"]};
+ catI:["Extra","Venta","Regalo","Otros"],tarjetas:[]};
 const CFG0=JSON.stringify(cfg);
 $("mes").value=today().slice(0,7);
 
@@ -255,7 +257,7 @@ function render(){
 function pRes(c){
  $("p-res").innerHTML=`<div class="grid">
  <div class="card"><div class="k">Tu ganancia neta (barbería)</div><div class="v inc">${money(c.netB)}</div><div class="sub">+ extras ${money(c.ingMan)}</div></div>
- <div class="card"><div class="k">Gastos</div><div class="v exp">${money(c.gasto)}</div><div class="sub">Ritmo del mes ${money(c.ritmo)}</div></div>
+ <div class="card"><div class="k">Gastos</div><div class="v exp">${moneyX(c.gasto)}</div><div class="sub">Ritmo del mes ${money(c.ritmo)}</div></div>
  <div class="card"><div class="k">Apartado (ahorro, metas, deudas)</div><div class="v save">${money(c.aA+c.aM+c.aD)}</div></div>
  <div class="card"><div class="k">Queda en la mano</div><div class="v ${c.bal>=0?"ok":"bad"}">${money(c.bal)}</div></div></div>
  ${carteraHtml()}<div class="card"><h2>¿A dónde se va el dinero?</h2><div class="box"><canvas id="c1"></canvas></div></div>
@@ -268,26 +270,30 @@ function pRes(c){
  chart("c3",{type:"pie",data:{labels:["Gastos","Ahorro","Metas","Deudas","Queda"],datasets:[{data:[c.gasto,c.aA,c.aM,c.aD,Math.max(0,c.bal)],backgroundColor:[CC("exp"),"#2563eb","#7c3aed","#d97706","#16a34a"],borderWidth:0}]},options:{maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
 }
 const opts=a=>a.map(x=>`<option value="${esc(x.id||x)}">${esc(x.n||x)}</option>`).join("");
-function pMov(c){
+function pMov(c){EDIT=null;
  $("p-mov").innerHTML=`<div class="card"><h2>Añadir movimiento</h2>
  <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro: meter dinero</option><option value="ahorro-">Ahorro: sacar dinero</option><option value="meta">Aporte a una meta</option><option value="deuda">Pago de una deuda</option><option value="mover">Transferencia</option></select></div>
  <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(gastoCats())}</select></div>
  <div class="f hidden" id="mxw"><label>Sacar de</label><select id="mx"></select></div><div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
- <button class="btn" id="ms">Guardar</button><p id="mmsg" class="bad"></p></div>
+ <button class="btn" id="ms">Guardar</button><button class="chip hidden" id="mcancel" style="width:100%;margin-top:8px">Cancelar edición</button><p id="mmsg" class="bad"></p></div>
  <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.id-a.id)).map(x=>`<div class="row mv mv-${x.tipo==="ingreso"?"inc":x.tipo==="gasto"?"exp":x.tipo==="asig"?"trf":"sav"}"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${x.tipo==="asig"?"transferencia · "+esc(x.categoria):esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
- <div style="text-align:right"><b>${money(x.monto)}</b><br><button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
+ <div style="text-align:right"><b>${moneyX(x.monto)}</b><br>${x.tipo!=="asig"?`<button class="chip" data-ed="${x.id}" style="padding:1px 8px">Editar</button> `:""}<button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
  fitMov();
  const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría / sobre":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":t==="mover"?"Transferir a (sobre)":"—";
   $("mc").parentNode.classList.toggle("hidden",!["gasto","ingreso","meta","deuda","mover"].includes(t));$("mxw").classList.toggle("hidden",t!=="mover");
   $("mx").innerHTML='<option value="__sin">Sin asignar</option>'+opts(gastoCats());
   $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):t==="ingreso"?opts(cfg.catI):opts(gastoCats())};
  $("mt").onchange=sel;
+ $("mcancel").onclick=()=>{EDIT=null;render()};
  $("ms").onclick=function(){const bt=this;let t=$("mt").value,a=num($("ma").value);if(!(a>0)){$("mmsg").textContent="Escribe un monto válido.";return}
   if(t==="ahorro-"){t="ahorro";a=-a}
   if((t==="meta"||t==="deuda")&&!$("mc").value){$("mmsg").textContent="Primero crea una "+t+" en la pantalla Metas.";return}
   const f=$("mf").value,cat=$("mc").value,rows=[];
+  if(EDIT!==null){if(t==="mover"){$("mmsg").textContent="Las transferencias no se editan: bórralas y hazlas de nuevo.";return}
+   const id=EDIT,row={tipo:t,fecha:f,categoria:["gasto","meta","deuda","ingreso"].includes(t)?cat:null,descripcion:$("md").value.trim(),monto:a};
+   saving(bt,async()=>{const{error}=await sb.from("family_movs").update(row).eq("id",id);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}EDIT=null;await load();return true});return}
   if(t==="mover"){const src=$("mx").value;if(!cat||src===cat){$("mmsg").textContent="Elige sobres distintos.";return}
    rows.push({tipo:"asig",fecha:f,categoria:cat,descripcion:"desde "+(src==="__sin"?"Sin asignar":src),monto:a});if(src!=="__sin")rows.push({tipo:"asig",fecha:f,categoria:src,descripcion:"hacia "+cat,monto:-a})}
   else{
@@ -375,22 +381,23 @@ function ritmoSem(){const nd=netDays(),t=today(),cs=wkS(t),wk={};Object.keys(nd)
 function sobresData(){
  const t=today(),m=t.slice(0,7),c=calc(m),dim=c.dim,eom=m+"-"+String(dim).padStart(2,"0"),list=[];
  const as=movs.filter(x=>x.tipo==="asig"&&String(x.fecha).slice(0,7)===m),gs=movs.filter(x=>x.tipo==="gasto"&&String(x.fecha).slice(0,7)===m);
- const mk=(n,p,bud,o)=>{if(!(bud>0))return;const asg=sum(as.filter(x=>x.categoria===n).map(x=>num(x.monto))),sp=sum(gs.filter(x=>x.categoria===n).map(x=>num(x.monto))),days=Math.max(0,diff(t,o.D)),wl=Math.max(1,Math.ceil((days+1)/7));
-  list.push({n,p,bud,asg,sp,bal:asg-sp,falta:Math.max(0,bud-asg),sem:0,venc:false,...o,days,wl})};
+ const mk=(n,p,bud,o)=>{if(!(bud>0))return;const asg=sum(as.filter(x=>x.categoria===n).map(x=>num(x.monto))),sp=sum(gs.filter(x=>x.categoria===n).map(x=>num(x.monto))),carry=sum(movs.filter(x=>(x.tipo==="asig"||x.tipo==="gasto")&&x.categoria===n&&String(x.fecha).slice(0,7)<m).map(x=>x.tipo==="asig"?num(x.monto):-num(x.monto))),days=Math.max(0,diff(t,o.D)),wl=Math.max(1,Math.ceil((days+1)/7));
+  list.push({n,p,bud,asg,sp,carry,bal:carry+asg-sp,falta:Math.max(0,bud-asg),sem:0,venc:false,...o,days,wl})};
  fijosOf(m).forEach(x=>{if(num(x.a)>0)mk(x.n,"fecha",num(x.a),{D:x.v?m+"-"+String(Math.min(+x.v,dim)).padStart(2,"0"):eom,venc:!!x.v})});
- cfg.catG.filter(x=>!x.f&&(num(x.b)>0||num(x.sem)>0)).forEach(x=>{let D=eom,sem=0;if(x.dia!==""&&x.dia!==undefined&&x.dia!==null&&num(x.sem)>0){const d=parseD(t);d.setDate(d.getDate()+(+x.dia-d.getDay()+7)%7);D=fmt(d);sem=num(x.sem)}
+ cfg.catG.filter(x=>!x.f&&(num(x.b)>0||num(x.sem)>0)).forEach(x=>{let D=eom,sem=0;if(x.dia!==""&&x.dia!==undefined&&x.dia!==null&&num(x.sem)>0){const d=parseD(t);d.setDate(d.getDate()+(+x.dia-d.getDay()+7)%7);D=fmt(d);sem=num(x.sem);if(D===t&&gs.some(g=>g.categoria===x.n&&String(g.fecha).slice(0,10)===t)){const d2=parseD(t);d2.setDate(d2.getDate()+7);D=fmt(d2)}}
   mk(x.n,x.p||(["Comida","Transporte","Salud"].includes(x.n)?"vital":"gusto"),num(x.b)>0?num(x.b):sem*[...Array(dim)].filter((_,i)=>new Date(+m.slice(0,4),+m.slice(5,7)-1,i+1).getDay()===+x.dia).length,{D,sem})});
- list.forEach(e=>{e.need=e.falta<=0?0:e.sem>0?Math.min(e.falta,Math.max(0,e.sem-e.bal)):e.days<=7?e.falta:Math.min(e.falta,rd10(e.falta/e.wl))});
+const c10=v=>Math.ceil(v/10-1e-9)*10;
+ list.forEach(e=>{e.need=e.falta<=0?0:c10(e.sem>0?Math.min(e.falta,Math.max(0,e.sem-(e.bal-e.carry))):e.days<=7?e.falta:Math.min(e.falta,rd10(e.falta/e.wl)))});
  const cart=cartera(),piso=num(cfg.piso),sin=cart-sum(list.map(e=>Math.max(0,e.bal))),rank={vital:0,fecha:1,meta:2,gusto:3};
  const og=cfg.metas.some(g=>num(g.ini)+sum(movs.filter(x=>x.tipo==="meta"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.obj)),od=cfg.deudas.some(g=>sum(movs.filter(x=>x.tipo==="deuda"&&x.categoria===g.id).map(x=>num(x.monto)))<num(g.tot)),dE=Math.max(0,diff(t,eom)),wE=Math.max(1,Math.ceil((dE+1)/7)),aps=[];
- [["Ahorro","ahorro",c.mA,c.aA,c.pA,1,cfg.pAh],["Metas","meta",c.mM,c.aM,c.pM,og,cfg.pMe],["Deudas","deuda",c.mD,c.aD,c.pD,od,cfg.pDe]].forEach(a=>{if(a[5]&&a[4]>0)aps.push({n:a[0],p:a[6]||"meta",ap:a[1],bud:a[2],sp:a[3],bal:0,falta:a[4],need:dE<=7?a[4]:Math.min(a[4],rd10(a[4]/wE)),D:eom,days:dE,wl:wE,give:0})});
+ [["Ahorro","ahorro",c.mA,c.aA,c.pA,1,cfg.pAh],["Metas","meta",c.mM,c.aM,c.pM,og,cfg.pMe],["Deudas","deuda",c.mD,c.aD,c.pD,od,cfg.pDe]].forEach(a=>{if(a[5]&&a[4]>0)aps.push({n:a[0],p:a[6]||"meta",ap:a[1],bud:a[2],sp:a[3],bal:0,falta:a[4],need:c10(dE<=7?a[4]:Math.min(a[4],rd10(a[4]/wE))),D:eom,days:dE,wl:wE,give:0})});
  const ord=list.concat(aps).sort((a,b)=>((a.days<=7?0:1)-(b.days<=7?0:1))||rank[a.p]-rank[b.p]||a.D.localeCompare(b.D));
- let av=sin>0?Math.max(0,sin-piso):0;
+ let av=sin>0?Math.floor(Math.max(0,sin-piso)/10)*10:0;
  const fr={vital:.5,fecha:.35,meta:.25,gusto:.15},fl=e=>e.need>0?Math.min(e.need,Math.max(10,rd10(e.need*(fr[e.p]||.25)))):0,F=sum(ord.map(fl));
  ord.forEach(e=>{e.give=0});
  if(F<=av){ord.forEach(e=>{e.give=fl(e)});av-=F}
  else if(av>0){let left=av;ord.forEach(e=>{const m=fl(e);if(m>0&&left>0){const g=Math.min(left,Math.max(10,Math.floor(m*av/F/10)*10));e.give=g;left-=g}});av=left}
- ord.forEach(e=>{if(e.need>e.give&&av>0){const g=Math.min(e.need-e.give,av);e.give+=g;av-=g}});
+ ord.forEach(e=>{if(e.need>e.give&&av>0){const g=Math.floor(Math.min(e.need-e.give,av)/10)*10;e.give+=g;av-=g}});
  const oblig=sum(list.map(e=>Math.max(0,e.bud-e.sp)))+c.pA+c.pM+c.pD,nd=netDays(),vals=Object.keys(nd).sort().slice(-24).map(k=>nd[k]).filter(v=>v>0),avg=vals.length?sum(vals)/vals.length:0;
  let rest=0;try{rest=Math.max(0,proj(m).end-c.netB)}catch(e){}
  const gap=oblig-cart,repF=movs.filter(x=>x.tipo==="asig"&&x.descripcion==="reparto"&&String(x.fecha).slice(0,10)>=wkS(t)).map(x=>String(x.fecha).slice(0,10)).sort().pop()||"";
@@ -403,6 +410,18 @@ function takeFrom(amt,to,S){const st=[];let r=amt;
   .sort((a,b)=>a.cls-b.cls||b.e.days-a.e.days).forEach(o=>add(o.e.n,o.lend,0));
  add("Sin asignar (piso)",Math.min(S.sin,S.piso),1);
  return{steps:st,short:r}}
+function sobrante(S){
+ const c=S.c,fm=c.prom*cfg.fondoMeses,free=Math.max(0,Math.min(S.cart-S.ritmo.oblig-S.piso,S.sin-S.piso)),it=[];let rem=free;
+ const adv=compras().filter(o=>o.left!==null&&o.left<=10).map(o=>o.n);
+ if(free<10)return{free:0,items:[],rest:0,adv};
+ const take=x=>{x=Math.max(0,Math.min(rem,Math.floor(x/10)*10));rem-=x;return x},gus=S.list.find(e=>e.p==="gusto"),prem=take(rd10(free*.1));
+ const gF=fm-c.ahorroTot;if(gF>0){const a=take(gF);if(a>0)it.push({k:"ahorro",n:"Fondo de emergencia (ahorro)",amt:a,why:"está al "+Math.round(c.ahorroTot/fm*100)+"% de su meta"})}
+ const dd=cfg.deudas.map(g=>({g,rest:Math.max(0,num(g.tot)-sum(movs.filter(x=>x.tipo==="deuda"&&x.categoria===g.id).map(x=>num(x.monto))))})).filter(o=>o.rest>0).sort((a,b)=>a.rest-b.rest);
+ if(dd.length){const a=take(dd[0].rest);if(a>0)it.push({k:"deuda",n:"Deuda «"+dd[0].g.n+"»",id:dd[0].g.id,amt:a,why:"todavía debes "+money(dd[0].rest)})}
+ const mm=cfg.metas.map(g=>({g,rest:Math.max(0,num(g.obj)-num(g.ini)-sum(movs.filter(x=>x.tipo==="meta"&&x.categoria===g.id).map(x=>num(x.monto))))})).filter(o=>o.rest>0).sort((a,b)=>a.rest-b.rest);
+ if(mm.length){const a=take(mm[0].rest);if(a>0)it.push({k:"meta",n:"Meta «"+mm[0].g.n+"»",id:mm[0].g.id,amt:a,why:"es la más cercana: faltan "+money(mm[0].rest)})}
+ if(prem>0)it.push({k:"gusto",n:gus?"Gustos: sobre «"+gus.n+"»":"Un gusto pequeño",cat:gus?gus.n:"",amt:prem,why:"un premio por cumplir el mes"});
+ return{free,items:it,rest:rem,adv}}
 function asesor(){
  const S=sobresData(),c=S.c,R=S.ritmo,t=today(),dm=+t.slice(8),fr=dm/c.dim,A=[],M=money,add=(k,l,p,x)=>A.push({k,l,p,t:x});
  const how=T=>T.steps.length?"toma "+T.steps.map(x=>M(x.amt)+" de "+x.from).join(", ")+(T.short>0?" (aún faltarían "+M(T.short)+")":""):"no hay de dónde tomar";
@@ -415,7 +434,7 @@ function asesor(){
   if(e.sp>e.bud)add("over"+e.n,"bad",8,"«"+e.n+"»: te pasaste "+M(e.sp-e.bud)+" de lo planificado del mes.");
   else if(e.sp/e.bud>=.8&&e.sp/e.bud>fr+.15)add("rit"+e.n,"warn",6,"«"+e.n+"» lleva "+Math.round(e.sp/e.bud*100)+"% gastado y el mes va por el "+Math.round(fr*100)+"%.");
   else if(dm>=5&&e.p!=="fecha"&&e.sp>0&&e.sp/dm*c.dim>e.bud*1.1)add("pry"+e.n,"warn",5,"Al ritmo actual «"+e.n+"» cerraría el mes en "+M(e.sp/dm*c.dim)+" y su plan es "+M(e.bud)+".");
-  if(e.days<=7&&e.need>0){const dn=e.sem>0?"el "+DIAS[parseD(e.D).getDay()].toLowerCase():"el "+e.D.slice(8)+"/"+e.D.slice(5,7);
+  if(e.days<=7&&e.need>0&&!(e.sem>0&&e.days>0)){const dn=e.sem>0?"el "+DIAS[parseD(e.D).getDay()].toLowerCase():"el "+e.D.slice(8)+"/"+e.D.slice(5,7);
    if(e.give>=e.need)add("urg"+e.n,"ok",6,"«"+e.n+"» necesita "+M(e.need)+" para "+dn+": el reparto de hoy lo cubre.");
    else add("urg"+e.n,"bad",9,"«"+e.n+"» necesita "+M(e.need)+" para "+dn+" y hoy solo se pueden asignar "+M(e.give)+". Para completar "+how(takeFrom(e.need-e.give,e.n,S))+".")}});
  if(S.list.length){
@@ -434,19 +453,25 @@ function asesor(){
  const top=Object.entries(c.byCat).sort((a,b)=>b[1]-a[1])[0];if(top&&c.gasto>0&&top[1]/c.gasto>.4)add("conc","info",3,"«"+top[0]+"» es el "+Math.round(top[1]/c.gasto*100)+"% de todo lo que gastas este mes.");
  const nm=S.list.map(e=>e.n),sp=Object.entries(c.byCat).filter(x=>!nm.includes(x[0])&&x[1]>0);if(sp.length)add("sinplan","info",4,"Gastaste "+M(sum(sp.map(x=>x[1])))+" en categorías sin monto planificado ("+sp.map(x=>x[0]).join(", ")+"). Dales un monto por mes en Ajustes.");
  if(S.list.length&&!S.repHecho&&sum(S.ord.map(e=>e.give))>0)add("rep",S.esDom?"info":"warn",S.esDom?8:6,S.esDom?"Hoy es domingo: aplica el reparto de la semana en Sobres.":"Aún no has aplicado el reparto de esta semana (Sobres).");
+ {const SB=sobrante(S);if(SB.free>=10&&SB.items.length){const fin=dm>=c.dim-2||dm<=7;
+  add("sob","info",fin?8:4,(fin?"Cierre de mes: sobraron ":"Te sobran ")+M(SB.free)+" libres (sin contar el piso ni lo que falta del mes). Te recomiendo: "+SB.items.map(x=>M(x.amt)+" a "+x.n).join("; ")+(SB.rest>=10?"; y dejar "+M(SB.rest)+" sin asignar como colchón para el mes que viene":"")+"."+(SB.adv.length?" Por los precios que suben, considera adelantar: "+SB.adv.join(", ")+".":"")+" Puedes aplicarlo en Sobres.")}}
+ if(dm<=7){const ac=S.list.filter(e=>e.carry>=10);if(ac.length)add("acum","info",5,"Del mes anterior quedaron acumulados dentro de sus sobres: "+ac.map(e=>e.n+" "+M(e.carry)).join(", ")+". Quedan como colchón extra: este mes igual se les asigna su monto completo.")}
  return A.sort((a,b)=>b.p-a.p)}
 const avisos=()=>asesor().filter(a=>a.l==="bad"||a.l==="warn").slice(0,5);
 async function maybeSend(al){if(!cfg.wa||!CB.bot_url||!CB.mi_numero)return;const t=today(),old=cfg.sent&&cfg.sent.d===t?cfg.sent.k:[],nw=al.filter(a=>a.l==="bad"&&!old.includes(a.k));if(!nw.length)return;
  const txt="💰 Finanzas del hogar\n"+nw.map(a=>"• "+a.t).join("\n"),url=String(CB.bot_url).replace(/\{texto\}/g,encodeURIComponent(txt)).replace(/\{numero\}/g,digits(CB.mi_numero));
  try{await fetch(url,{mode:"no-cors"});cfg.sent={d:t,k:old.concat(nw.map(a=>a.k))};await saveCfg()}catch(e){}}
 function avisosHtml(){const A=avisos();return'<div class="card"><h2>Avisos</h2>'+(A.length?A.map(a=>'<div class="tip">'+(a.l==="bad"?"🔴":"🟡")+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Todo en orden ✅</div>')+'</div>'}
-function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
+function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Efectivo sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.tarjetas.length?'<div class="sub">En tarjetas (aparte): '+moneyX(sum(cfg.tarjetas.map(x=>num(x.s))))+'</div>':"")+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
 const gastoCats=()=>fijosOf(today().slice(0,7)).map(x=>x.n).concat(cfg.catG.filter(x=>!x.f).map(x=>x.n));
+const tjRow=x=>'<div class="two2" data-id="'+esc(x.id||"")+'"><input class="tn" value="'+esc(x.n)+'" placeholder="Nombre (ej. Tarjeta personal)"><input class="ts" type="number" inputmode="decimal" placeholder="Saldo" value="'+(x.s===""||x.s===undefined?"":num(x.s))+'"><button class="chip" data-fx aria-label="Quitar">×</button></div>';
 function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slice(5,7),pc=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0,tot=sum(S.ord.map(e=>e.give));let cum=0;
- const nb=S.repHecho?"Ya aplicaste el reparto de esta semana ("+sd(S.repFecha)+"). El próximo es el domingo. Si necesitas mover dinero antes, usa Gastos → Transferencia.":(S.sin<=S.piso?"No hay botón de reparto porque no hay dinero libre sobre el piso: tienes "+money(S.sin)+" sin asignar y el piso es "+money(S.piso)+". ":"")+(!S.aps.length?"No hay nada por apartar este mes: el ahorro, las metas y las deudas salen de tus porcentajes de Ajustes sobre la ganancia del mes (más el dinero con el que empezaste este mes). Revisa que el porcentaje no sea 0. ":"")+(S.sin>S.piso&&S.c.ingreso>0?"No hay nada que repartir ahora. ":"")+"Para ahorrar ya, anota en Gastos el tipo «Ahorro: meter dinero».";
+ const nb=S.repHecho?"Ya aplicaste el reparto de esta semana ("+sd(S.repFecha)+"). El próximo es el domingo. Si necesitas mover dinero antes, usa Movimientos → Transferencia.":(S.sin<=S.piso?"No hay botón de reparto porque no hay dinero libre sobre el piso: tienes "+money(S.sin)+" sin asignar y el piso es "+money(S.piso)+". ":"")+(!S.aps.length?"No hay nada por apartar este mes: el ahorro, las metas y las deudas salen de tus porcentajes de Ajustes sobre la ganancia del mes (más el dinero con el que empezaste este mes). Revisa que el porcentaje no sea 0. ":"")+(S.sin>S.piso&&S.c.ingreso>0?"No hay nada que repartir ahora. ":"")+"Para ahorrar ya, anota en Movimientos el tipo «Ahorro: meter dinero».";
  let h='<div class="card"><h2>Dinero sin asignar</h2><div class="v '+(S.sin<0?"bad":S.sin<S.piso?"warn":"ok")+'">'+money(S.sin)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.sin-S.piso))+' · cartera total '+money(S.cart)+'</div></div>';
- h+='<div class="card"><h2>Sobres</h2>'+(S.list.length?S.list.map(e=>'<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>'+esc(e.n)+' <span class="sub">'+({vital:"vital",fecha:"con fecha",gusto:"gusto"}[e.p]||"")+'</span></b><b class="'+(e.bal<0?"bad":"")+'">'+money(e.bal)+'</b></div><div class="bar"><i style="width:'+pc(e.sp,e.bud)+'%;background:'+(e.sp>e.bud?"var(--bad)":"var(--save)")+'"></i></div><div class="sub">Gastado '+money(e.sp)+' de '+money(e.bud)+' · falta llenar '+money(e.falta)+(e.need>0?" · necesita "+money(e.need)+" antes del "+sd(e.D):"")+(e.give>0?" → reparto "+money(e.give):"")+'</div></div>').join(""):'<div class="sub">Crea tus sobres en Ajustes: gastos fijos y categorías con monto por mes.</div>')+
+ h+='<div class="card"><h2>Tarjetas</h2><div class="sub">Efectivo (cartera): <b>'+money(S.cart)+'</b> · En tarjetas: <b>'+moneyX(sum(cfg.tarjetas.map(x=>num(x.s))))+'</b>. Se ven aparte: las tarjetas no se suman a la cartera ni al reparto. Escribe tú el nombre y el saldo.</div><div id="tj" style="margin-top:8px">'+cfg.tarjetas.map(tjRow).join("")+'</div><button class="chip" data-tjadd style="width:100%;margin-bottom:8px">+ Añadir tarjeta</button><button class="btn" data-tjsave="1">Guardar tarjetas</button></div>';
+ h+='<div class="card"><h2>Sobres</h2>'+(S.list.length?S.list.map(e=>'<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>'+esc(e.n)+' <span class="sub">'+({vital:"vital",fecha:"con fecha",gusto:"gusto"}[e.p]||"")+'</span></b><b class="'+(e.bal<0?"bad":"")+'">'+moneyX(e.bal)+'</b></div><div class="bar"><i style="width:'+pc(e.sp,e.bud)+'%;background:'+(e.sp>e.bud?"var(--bad)":"var(--save)")+'"></i></div><div class="sub">Gastado '+moneyX(e.sp)+' de '+money(e.bud)+' · falta llenar '+money(e.falta)+(e.carry>0?" · acumulado del mes anterior "+money(e.carry):"")+(e.need>0?" · necesita "+money(e.need)+" antes del "+sd(e.D):"")+(e.give>0?" → reparto "+money(e.give):"")+'</div></div>').join(""):'<div class="sub">Crea tus sobres en Ajustes: gastos fijos y categorías con monto por mes.</div>')+
   (tot>0&&!S.repHecho?'<button class="btn" data-rep="1" style="margin-top:10px">'+(S.esDom?"Aplicar reparto de la semana":"Aplicar reparto de la semana (pendiente)")+' ('+money(tot)+')</button><div class="sub" style="margin-top:6px">El reparto nunca toca el piso: quedarían '+money(S.sin-tot)+' sin asignar.</div>':'<div class="sub" style="margin-top:10px">'+nb+'</div>')+'</div>';
+ const SB=sobrante(S);if(SB.items.length)h+='<div class="card"><h2>Sobrante libre</h2><div class="sub">Dinero libre por encima del piso y de lo que falta del mes: '+money(SB.free)+'. Recomendación:</div>'+SB.items.map(x=>'<div class="row"><div><b>'+esc(x.n)+'</b><div class="sub">'+esc(x.why)+'</div></div><b class="save">'+money(x.amt)+'</b></div>').join("")+(SB.rest>=10?'<div class="sub" style="margin-top:6px">El resto ('+money(SB.rest)+') queda sin asignar como colchón para el mes siguiente.</div>':'')+(SB.adv.length?'<div class="sub" style="margin-top:6px">Por los precios que suben, considera adelantar: '+esc(SB.adv.join(", "))+'.</div>':'')+'<button class="btn" data-sob="1" style="margin-top:10px">Aplicar recomendación ('+money(SB.items.reduce((a,x)=>a+(x.k==="gusto"&&!x.cat?0:x.amt),0))+')</button></div>';
  if(S.aps.length)h+='<div class="card"><h2>Apartar este mes</h2>'+S.aps.map(e=>'<div class="row"><div><b>'+e.n+'</b><div class="sub">Llevas '+money(e.sp)+' de '+money(e.bud)+' · esta semana '+money(e.need)+(e.give>0?"":" · sin dinero libre por ahora (primero van lo vital y lo que vence)")+'</div></div><b class="save">'+(e.give>0?"→ "+money(e.give):"—")+'</b></div>').join("")+'</div>';
  h+='<div class="card"><h2>Plan de relleno</h2><div class="sub">Lo próximo que entre irá en este orden.</div>'+(S.plan.length?S.plan.map(e=>{cum+=e.need;return'<div class="row"><div><b>'+esc(e.n)+'</b><div class="sub">necesita '+money(e.need)+' antes del '+sd(e.D)+'</div></div><div class="sub">acum. '+money(cum)+'</div></div>'}).join(""):'<div class="sub">No hay nada urgente por llenar.</div>')+'</div>';
  h+='<div class="card"><h2>Este mes</h2><div class="row"><span>Falta por gastar o apartar</span><b>'+money(R.oblig)+'</b></div><div class="row"><span>Tienes en la cartera</span><b>'+money(R.cart)+'</b></div><div class="row"><span>Esperas ganar lo que queda</span><b class="inc">'+money(R.projRest)+'</b></div><div class="row"><span>'+(R.gap<=0?"Te sobra":"Te falta")+'</span><b class="'+(R.gap<=0?"ok":R.projRest>=R.gap?"warn":"bad")+'">'+money(Math.abs(R.gap))+'</b></div></div>';
@@ -491,7 +516,7 @@ const HELP={
 "Ingresos y gastos por día":"Cada punto verde es lo que ganaste ese día y cada punto rojo lo que gastaste. Sirve para ver en qué días entra o sale más dinero.",
 "Reparto del mes":"Del dinero del mes, qué parte se fue en gastos, ahorro, metas, deudas y cuánto queda.",
 "Añadir movimiento":"Aquí anotas gastos, ingresos extra, ahorro y aportes a metas o deudas. Los gastos fijos págalos aquí con una categoría marcada «fijo».",
-"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido. Puedes borrar lo que se anotó mal. Verde matcha = ingresos, rojo borgoña = gastos, azul mar = transferencias, azul = ahorro, metas y deudas.",
+"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido, con los montos exactos. Puedes editar o borrar lo que se anotó mal. Verde matcha = ingresos, rojo borgoña = gastos, azul mar = transferencias, azul = ahorro, metas y deudas.",
 "Metas":"Cosas que quieren comprar o lograr. El tiempo se calcula dividiendo lo que falta entre el aporte mensual que le asignaste.",
 "Nueva meta":"Pon el nombre, cuánto cuesta y cuánto le aportarás cada mes. Con eso la web calcula en qué mes la completan.",
 "Deudas":"Lo que deben. La web calcula cuándo terminan según la cuota mensual. El % de deudas solo se aparta si hay alguna anotada.",
@@ -500,8 +525,10 @@ const HELP={
 "Dinero realmente libre":"Lo que puedes gastar sin dañar nada: ganancia menos gastos hechos, fijos que faltan y lo que falta por apartar.",
 "Fondo de emergencia":"Ahorro para imprevistos. La meta son varios meses de gastos; la barra muestra cuánto llevan.",
 "¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
+"Tarjetas":"Tus tarjetas del banco y su saldo, que tú escribes y actualizas a mano. Se ven aparte del efectivo y no se suman a la cartera ni al reparto. Nunca escribas aquí números de tarjeta ni claves: solo un nombre y el saldo.",
 "Dinero sin asignar":"Dinero que tienes pero aún no está dentro de ningún sobre. El piso es lo que siempre debe quedar aquí para compras que aparezcan.",
-"Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día. El reparto se aplica una vez por semana (domingo), nunca baja del piso y ningún sobre se queda en cero: primero cada uno recibe una parte mínima (mayor si es más prioritario) y luego se completa por prioridad.",
+"Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día. Lo que no uses de un sobre se queda acumulado ahí como colchón extra: el mes siguiente igual se le asigna su monto completo, como si ese acumulado no existiera. El reparto se aplica una vez por semana (domingo), nunca baja del piso y ningún sobre se queda en cero: primero cada uno recibe una parte mínima (mayor si es más prioritario) y luego se completa por prioridad.",
+"Sobrante libre":"Dinero que sobra después de cubrir el piso y todo lo que falta del mes. Te propongo en qué usarlo, en este orden: fondo de emergencia, deudas, la meta más cercana y un pequeño premio. Lo que quede se queda sin asignar para el mes siguiente. Puedes aplicar la recomendación con el botón.",
 "Apartar este mes":"Lo que toca separar del mes para ahorro, metas y deudas según tus porcentajes de Ajustes, sobre la ganancia del mes y el dinero con el que empezaste ese mes. Al aplicar el reparto, ese dinero sale de la cartera y queda anotado como ahorro, aporte a meta o pago de deuda.",
 "Plan de relleno":"El orden en que se llenarán los sobres con el próximo dinero que entre: primero lo más urgente.",
 "Este mes":"Compara lo que falta por gastar o apartar este mes con lo que tienes y lo que se espera que ganes. Así sabes si puedes ir con calma o necesitas trabajar más.",
@@ -528,6 +555,7 @@ async function saving(btn,fn){const old=btn.textContent;btn.disabled=true;btn.cl
  let ok=false;try{ok=await fn()}catch(e){alert(e.message||e)}
  btn.classList.remove("busy");btn.textContent=ok?"¡Guardado ✓!":"No se guardó";if(ok)btn.classList.add("done");live(ok?"ok":"bad",ok?"Guardado ✓":"Error al guardar");
  setTimeout(()=>{btn.textContent=old;btn.classList.remove("done");btn.disabled=false;live("idle");if(ok)render()},1200)}
+let EDIT=null;
 let lastAct=Date.now();["click","input","touchstart","keydown","scroll"].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},{passive:true,capture:true}));
 const busyUI=()=>Date.now()-lastAct<120000||!!document.querySelector(".help:not(.hidden)")||!!($("pv")&&$("pv").innerHTML.trim())||document.activeElement.matches("input,select,textarea");
 async function refresh(){if(document.hidden||$("app").classList.contains("hidden")||liveKind==="save")return;await load();if(["res","pla","ase"].includes(tab)&&!busyUI())render()}
@@ -542,6 +570,13 @@ document.addEventListener("click",async e=>{
   saving(b,async()=>{const a=await sb.from("family_movs").delete().gte("id",0);if(a.error){$("rsm").textContent=a.error.message;return false}
    const c2=await sb.from("family_config").delete().eq("id",1);if(c2.error){$("rsm").textContent=c2.error.message;return false}
    movs=[];cfg=JSON.parse(CFG0);return true});return}
+ if(b=t.closest("[data-tjadd]")){$("tj").insertAdjacentHTML("beforeend",tjRow({n:"",s:""}));$("tj").lastElementChild.querySelector(".tn").focus();return}
+ if(b=t.closest("[data-tjsave]")){const arr=[...document.querySelectorAll("#tj .two2")].map((r,i)=>({id:r.dataset.id||"t"+Date.now()+i,n:r.querySelector(".tn").value.trim(),s:num(r.querySelector(".ts").value)})).filter(x=>x.n||x.s);
+  saving(b,async()=>{cfg.tarjetas=arr;return await saveCfg()});return}
+ if(b=t.closest("[data-sob]")){const S=sobresData(),SB=sobrante(S),f=today(),rows=[];
+  SB.items.forEach(x=>{if(x.k==="ahorro")rows.push({tipo:"ahorro",fecha:f,categoria:null,descripcion:"sobrante",monto:x.amt});else if(x.k==="gusto"){if(x.cat)rows.push({tipo:"asig",fecha:f,categoria:x.cat,descripcion:"sobrante",monto:x.amt})}else rows.push({tipo:x.k,fecha:f,categoria:x.id,descripcion:"sobrante",monto:x.amt})});
+  if(!rows.length)return;if(S.sin-sum(rows.map(r=>num(r.monto)))<S.piso-1){alert("Esto dejaría el dinero sin asignar por debajo del piso. No se aplicó.");return}
+  saving(b,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){alert(error.message);return false}await load();return true});return}
  if(b=t.closest("[data-rep]")){const S=sobresData(),f=today(),rows=[];S.ord.forEach(e=>{if(!(e.give>0))return;
   if(!e.ap){rows.push({tipo:"asig",fecha:f,categoria:e.n,descripcion:"reparto",monto:e.give});return}
   if(e.ap==="ahorro"){rows.push({tipo:"ahorro",fecha:f,categoria:null,descripcion:"reparto",monto:e.give});return}
@@ -551,12 +586,18 @@ document.addEventListener("click",async e=>{
   if(S.repHecho){alert("Ya aplicaste el reparto de esta semana.");return}
   if(S.sin-sum(rows.map(r=>num(r.monto)))<S.piso-1){alert("Este reparto dejaría el dinero sin asignar por debajo del piso. No se aplicó.");return}
   saving(b,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){alert(error.message);return false}await load();return true});return}
+ if(b=t.closest("[data-ed]")){const x=movs.find(m=>String(m.id)===b.dataset.ed);if(!x)return;EDIT=x.id;
+  $("mt").value=x.tipo==="ahorro"&&num(x.monto)<0?"ahorro-":x.tipo;$("mt").onchange();
+  if(["gasto","ingreso","meta","deuda"].includes(x.tipo))$("mc").value=x.categoria||"";
+  $("mf").value=String(x.fecha).slice(0,10);$("md").value=x.descripcion||"";$("ma").value=Math.abs(num(x.monto));
+  $("ms").textContent="Guardar cambios";$("mcancel").classList.remove("hidden");$("mmsg").textContent="Editando un movimiento: cambia lo que necesites y pulsa «Guardar cambios».";
+  window.scrollTo({top:0,behavior:"smooth"});return}
  if(b=t.closest("[data-help]")){b.parentNode.nextElementSibling.classList.toggle("hidden");return}
  if(b=t.closest("[data-cadd]")){const g=b.dataset.cadd==="g";$(g?"cg":"ci").insertAdjacentHTML("beforeend",crow("",0,g));const L=$(g?"cg":"ci").lastElementChild;if(g){L.querySelector(".cdet").classList.remove("hidden");L.querySelector("[data-gear]").classList.add("on")}L.querySelector(".cn").focus();return}
  if(b=t.closest("[data-del]")){if(!confirm("¿Borrar este movimiento?"))return;await sb.from("family_movs").delete().eq("id",b.dataset.del);await load();render();return}
  if(b=t.closest("[data-gear]")){b.classList.toggle("on");b.closest(".crow").querySelector(".cdet").classList.toggle("hidden");return}
  if(b=t.closest("[data-mv]")){const r=b.closest(".crow"),d=+b.dataset.mv;if(d<0&&r.previousElementSibling)r.parentNode.insertBefore(r,r.previousElementSibling);if(d>0&&r.nextElementSibling)r.parentNode.insertBefore(r.nextElementSibling,r);r.scrollIntoView({block:"nearest"});return}
- if(b=t.closest("[data-fx]")){b.closest(".crow,.two").remove();return}
+ if(b=t.closest("[data-fx]")){b.closest(".crow,.two,.two2").remove();return}
  if(b=t.closest("[data-fadd]")){$("fj").insertAdjacentHTML("beforeend",'<div class="two"><input class="fn" placeholder="Nombre"><input class="fa" type="number" inputmode="decimal"><input class="fv" type="number" inputmode="numeric" placeholder="Día"><button class="chip" data-fx>×</button></div>');return}
  if(b=t.closest("[data-save]")){
   const m=$("mes").value,nf=[...document.querySelectorAll("#fj .two")].map(r=>({n:r.querySelector(".fn").value.trim(),a:num(r.querySelector(".fa").value),v:num(r.querySelector(".fv").value)||0})).filter(x=>x.n||x.a),
