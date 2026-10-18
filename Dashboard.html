@@ -121,6 +121,7 @@ async function load(){
   const c=await sb.from("family_config").select("valores").eq("id",1).maybeSingle();
   if(c.data&&c.data.valores)cfg={...cfg,...c.data.valores};
   movs=movs.filter(x=>String(x.fecha).slice(0,10)>=D0());
+  movs.forEach(parseTags);
   // ajustes de la barbería (para repartir igual que ella)
   let cb={};try{const a=await sb.from("ajustes").select("valor").eq("clave","config").limit(1);if(a.data&&a.data.length)cb=a.data[0].valor||{};else{const l=localStorage.getItem("monos_config");if(l)cb=JSON.parse(l)}}catch(e){}
   CB=cb;
@@ -274,34 +275,47 @@ function pMov(c){EDIT=null;
  $("p-mov").innerHTML=`<div class="card"><h2>Añadir movimiento</h2>
  <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro: meter dinero</option><option value="ahorro-">Ahorro: sacar dinero</option><option value="meta">Aporte a una meta</option><option value="deuda">Pago de una deuda</option><option value="mover">Transferencia</option></select></div>
  <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(gastoCats())}</select></div>
- <div class="f hidden" id="mxw"><label>Sacar de</label><select id="mx"></select></div><div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
+ <div class="f hidden" id="mpw"><label>¿Con qué pagas?</label><select id="mpay"></select></div><div class="f hidden" id="mdw"><label>¿A dónde entra?</label><select id="mdest"></select></div><div class="f hidden" id="mxw"><label>Sacar de</label><select id="mx"></select></div><div class="f"><label>Fecha</label><input id="mf" type="date" value="${today()}"></div>
  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
  <button class="btn" id="ms">Guardar</button><button class="chip hidden" id="mcancel" style="width:100%;margin-top:8px">Cancelar edición</button><p id="mmsg" class="bad"></p></div>
- <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.id-a.id)).map(x=>`<div class="row mv mv-${x.tipo==="ingreso"?"inc":x.tipo==="gasto"?"exp":x.tipo==="asig"?"trf":"sav"}"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${x.tipo==="asig"?"transferencia · "+esc(x.categoria):esc(x.tipo)}${x.tipo==="gasto"?" · "+esc(x.categoria):""}</div></div>
- <div style="text-align:right"><b>${moneyX(x.monto)}</b><br>${x.tipo!=="asig"?`<button class="chip" data-ed="${x.id}" style="padding:1px 8px">Editar</button> `:""}<button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
+ <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.id-a.id)).map(x=>`<div class="row mv mv-${x.tipo==="ingreso"?"inc":x.tipo==="gasto"?"exp":x.tipo==="asig"||x.tipo==="tmov"?"trf":"sav"}"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${mvSub(x)}</div></div>
+ <div style="text-align:right"><b>${moneyX(x.monto)}</b><br>${x.tipo!=="asig"&&x.tipo!=="tmov"?`<button class="chip" data-ed="${x.id}" style="padding:1px 8px">Editar</button> `:""}<button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
  fitMov();
- const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría / sobre":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":t==="mover"?"Transferir a (sobre)":"—";
+ const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría / sobre":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":t==="mover"?"Transferir a":"—";
   $("mc").parentNode.classList.toggle("hidden",!["gasto","ingreso","meta","deuda","mover"].includes(t));$("mxw").classList.toggle("hidden",t!=="mover");
-  $("mx").innerHTML='<option value="__sin">Sin asignar</option>'+opts(gastoCats());
-  $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):t==="ingreso"?opts(cfg.catI):opts(gastoCats())};
+  $("mpw").classList.toggle("hidden",t!=="gasto"||!cfg.tarjetas.length);$("mdw").classList.toggle("hidden",t!=="ingreso");
+  $("mx").innerHTML=epOpts();$("mpay").innerHTML='<option value="">Efectivo</option>'+cfg.tarjetas.map(x=>'<option value="'+esc(x.id)+'">💳 '+esc(x.n)+'</option>').join("");$("mdest").innerHTML=epOpts();
+  $("mc").innerHTML=t==="meta"?opts(cfg.metas):t==="deuda"?opts(cfg.deudas):t==="ingreso"?opts(cfg.catI):t==="mover"?epOpts():opts(gastoCats())};
  $("mt").onchange=sel;
  $("mcancel").onclick=()=>{EDIT=null;render()};
  $("ms").onclick=function(){const bt=this;let t=$("mt").value,a=num($("ma").value);if(!(a>0)){$("mmsg").textContent="Escribe un monto válido.";return}
   if(t==="ahorro-"){t="ahorro";a=-a}
   if((t==="meta"||t==="deuda")&&!$("mc").value){$("mmsg").textContent="Primero crea una "+t+" en la pantalla Metas.";return}
-  const f=$("mf").value,cat=$("mc").value,rows=[];
+  const f=$("mf").value,cat=$("mc").value,desc=$("md").value.trim(),pay=$("mpw").classList.contains("hidden")?"":$("mpay").value,dst=$("mdw").classList.contains("hidden")?"sin":$("mdest").value,rows=[];
+  const tjD=dst.indexOf("t:")===0?dst.slice(2):"",dsD=dst.indexOf("s:")===0?dst.slice(2):"";
+  const one=()=>({tipo:t,fecha:f,categoria:["gasto","meta","deuda","ingreso"].includes(t)?cat:null,descripcion:wd(desc,t==="gasto"?pay:tjD,t==="ingreso"?dsD:""),monto:a});
   if(EDIT!==null){if(t==="mover"){$("mmsg").textContent="Las transferencias no se editan: bórralas y hazlas de nuevo.";return}
-   const id=EDIT,row={tipo:t,fecha:f,categoria:["gasto","meta","deuda","ingreso"].includes(t)?cat:null,descripcion:$("md").value.trim(),monto:a};
+   const id=EDIT,row=one();
    saving(bt,async()=>{const{error}=await sb.from("family_movs").update(row).eq("id",id);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}EDIT=null;await load();return true});return}
-  if(t==="mover"){const src=$("mx").value;if(!cat||src===cat){$("mmsg").textContent="Elige sobres distintos.";return}
-   rows.push({tipo:"asig",fecha:f,categoria:cat,descripcion:"desde "+(src==="__sin"?"Sin asignar":src),monto:a});if(src!=="__sin")rows.push({tipo:"asig",fecha:f,categoria:src,descripcion:"hacia "+cat,monto:-a})}
+  if(t==="mover"){const from=$("mx").value,to=cat;if(!to||from===to){$("mmsg").textContent="Elige un origen y un destino distintos.";return}
+   const pt=v=>v==="sin"?{k:"sin"}:v.indexOf("s:")===0?{k:"s",n:v.slice(2)}:{k:"t",id:v.slice(2)},F=pt(from),T=pt(to),
+    A=(n,m,tj)=>({tipo:"asig",fecha:f,categoria:n,descripcion:wd("transferencia",tj),monto:m}),M=(id,m)=>({tipo:"tmov",fecha:f,categoria:null,descripcion:wd("transferencia",id),monto:m});
+   if(F.k==="sin"&&T.k==="s")rows.push(A(T.n,a));
+   else if(F.k==="s"&&T.k==="sin")rows.push(A(F.n,-a));
+   else if(F.k==="s"&&T.k==="s"){rows.push(A(T.n,a));rows.push(A(F.n,-a))}
+   else if(F.k==="sin"&&T.k==="t")rows.push(M(T.id,-a));
+   else if(F.k==="t"&&T.k==="sin")rows.push(M(F.id,a));
+   else if(F.k==="s"&&T.k==="t")rows.push(A(F.n,-a,T.id));
+   else if(F.k==="t"&&T.k==="s")rows.push(A(T.n,a,F.id));
+   else if(F.k==="t"&&T.k==="t"){rows.push(M(F.id,a));rows.push(M(T.id,-a))}}
   else{
-   if(t==="gasto"&&f.slice(0,7)===today().slice(0,7)){const S=sobresData(),e=S.list.find(x=>x.n===cat);
+   if(t==="gasto"&&pay){const sd=tjSaldo(pay);if(a>sd&&!confirm("La tarjeta «"+tjName(pay)+"» tiene "+moneyX(sd)+" y el gasto es de "+moneyX(a)+": quedaría en negativo. ¿Continuar?"))return}
+   else if(t==="gasto"&&f.slice(0,7)===today().slice(0,7)){const S=sobresData(),e=S.list.find(x=>x.n===cat);
     if(e&&a>e.bal){const T=takeFrom(a-e.bal,cat,S);
      if(!confirm("El sobre «"+cat+"» tiene "+money(Math.max(0,e.bal))+" y la compra es de "+money(a)+".\nEl asesor propone tomar: "+(T.steps.map(x=>money(x.amt)+" de "+x.from).join(", ")||"no hay de dónde")+(T.short>0?"\nOjo: aún faltarían "+money(T.short)+" (el sobre quedará en rojo).":"")+"\n¿Aceptas?"))return;
      T.steps.forEach(x=>{rows.push({tipo:"asig",fecha:f,categoria:cat,descripcion:"desde "+x.from,monto:x.amt});if(!x.sin)rows.push({tipo:"asig",fecha:f,categoria:x.from,descripcion:"hacia "+cat,monto:-x.amt})})}}
-   rows.push({tipo:t,fecha:f,categoria:["gasto","meta","deuda","ingreso"].includes(t)?cat:null,descripcion:$("md").value.trim(),monto:a})}
+   rows.push(one())}
   saving(bt,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}await load();return true})};
 }
 const saveCfg=async()=>{const{error}=await sb.from("family_config").upsert({id:1,valores:cfg});if(error)alert("No se pudo guardar: "+error.message);return!error};
@@ -370,11 +384,23 @@ const D0=()=>cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde:B.start;
 function netFrom(m){if(m<B.start.slice(0,7))return{libre:0,days:{}};const nm=netMonth(m),d0=D0();if(d0<=m+"-01")return nm;const days={};let L=0;Object.keys(nm.days).forEach(k=>{if(k>=d0){days[k]=nm.days[k];L+=nm.days[k]}});return{libre:L,days}}
 function fitMov(){const bx=$("movl");if(!bx)return;const r=[...bx.children].filter(x=>x.classList.contains("row"));if(r.length<=10){bx.style.maxHeight="none";return}let h=0;for(let i=0;i<10;i++)h+=r[i].offsetHeight;if(h>0){bx.style.maxHeight=h+"px";bx.style.overflowY="auto"}}
 const addD=(s,n)=>{const d=parseD(s);d.setDate(d.getDate()+n);return fmt(d)};
+const parseTags=x=>{let d=String(x.descripcion||""),m;x.tj="";x.ds="";while((m=d.match(/\s*\[([td]):([^\]]*)\]\s*$/))){if(m[1]==="t")x.tj=m[2];else x.ds=m[2];d=d.slice(0,m.index)}x.descripcion=d};
+const wd=(d,tj,ds)=>String(d||"")+(tj?" [t:"+tj+"]":"")+(ds?" [d:"+ds+"]":"");
+const tjNet=id=>sum(movs.filter(x=>x.tj===id).map(x=>x.tipo==="ingreso"?num(x.monto):-num(x.monto)));
+const tjSaldo=id=>{const t=cfg.tarjetas.find(x=>x.id===id);return num(t&&t.s)+tjNet(id)};
+const tjTot=()=>sum(cfg.tarjetas.map(x=>tjSaldo(x.id)));
+const tjName=id=>{const t=cfg.tarjetas.find(z=>z.id===id);return t?t.n:"tarjeta"};
+const epOpts=()=>'<option value="sin">Sin asignar (efectivo)</option>'+gastoCats().map(n=>'<option value="s:'+esc(n)+'">Sobre: '+esc(n)+'</option>').join("")+cfg.tarjetas.map(x=>'<option value="t:'+esc(x.id)+'">💳 '+esc(x.n)+'</option>').join("");
+const mvSub=x=>{const T=x.tipo;
+ if(T==="tmov")return"transferencia · "+(num(x.monto)>0?"💳 "+esc(tjName(x.tj))+" → efectivo":"efectivo → 💳 "+esc(tjName(x.tj)));
+ if(T==="asig"){if(x.tj)return"transferencia · "+(num(x.monto)>0?"💳 "+esc(tjName(x.tj))+" → "+esc(x.categoria):esc(x.categoria)+" → 💳 "+esc(tjName(x.tj)));return"transferencia · "+esc(x.categoria)}
+ return esc(T)+(T==="gasto"?" · "+esc(x.categoria):"")+(x.tj?" · 💳 "+esc(tjName(x.tj)):"")+(x.ds?" · → "+esc(x.ds):"")};
 const wkS=d=>{const x=parseD(d);x.setDate(x.getDate()-x.getDay());return fmt(x)};
 function cartera(){const d0=cfg.cartDesde&&ISO.test(cfg.cartDesde)?cfg.cartDesde:B.start,cur=today().slice(0,7);let y=+d0.slice(0,4),mo=+d0.slice(5,7),s=num(cfg.cartera0);
  for(let i=0;i<120;i++){const k=y+"-"+String(mo).padStart(2,"0");if(k>cur)break;const dd=netMonth(k).days;Object.keys(dd).forEach(d=>{if(d>=d0)s+=dd[d]});mo++;if(mo>12){mo=1;y++}}
  const l=movs.filter(x=>String(x.fecha).slice(0,10)>=d0);
- return s+ofTipo(l,"ingreso")-ofTipo(l,"gasto")-ofTipo(l,"ahorro")-ofTipo(l,"deuda")-ofTipo(l,"meta")}
+ const ca=l.filter(x=>!x.tj);
+ return s+ofTipo(ca,"ingreso")-ofTipo(ca,"gasto")-ofTipo(l,"ahorro")-ofTipo(l,"deuda")-ofTipo(l,"meta")+sum(l.filter(x=>x.tj&&(x.tipo==="asig"||x.tipo==="tmov")).map(x=>num(x.monto)))}
 function netDays(){const all={},cur=today().slice(0,7);let y=+B.start.slice(0,4),mo=+B.start.slice(5,7);for(let i=0;i<120;i++){const k=y+"-"+String(mo).padStart(2,"0");if(k>cur)break;Object.assign(all,netFrom(k).days);mo++;if(mo>12){mo=1;y++}}return all}
 function ritmoSem(){const nd=netDays(),t=today(),cs=wkS(t),wk={};Object.keys(nd).forEach(d=>{const k=wkS(d);wk[k]=(wk[k]||0)+nd[d]});
  const prev=Object.keys(wk).filter(k=>k<cs).sort().slice(-4),base=prev.length?sum(prev.map(k=>wk[k]))/prev.length:null,cur=wk[cs]||0,wd=Math.max(1,diff(cs,t)+(dow(t)===0?0:0));
@@ -382,8 +408,8 @@ function ritmoSem(){const nd=netDays(),t=today(),cs=wkS(t),wk={};Object.keys(nd)
 function sobresData(){
  const t=today(),m=t.slice(0,7),c=calc(m),dim=c.dim,eom=m+"-"+String(dim).padStart(2,"0"),list=[];
  const as=movs.filter(x=>x.tipo==="asig"&&String(x.fecha).slice(0,7)===m),gs=movs.filter(x=>x.tipo==="gasto"&&String(x.fecha).slice(0,7)===m);
- const mk=(n,p,bud,o)=>{if(!(bud>0))return;const asg=sum(as.filter(x=>x.categoria===n).map(x=>num(x.monto))),sp=sum(gs.filter(x=>x.categoria===n).map(x=>num(x.monto))),wf=o.sem>0?sum(movs.filter(x=>x.tipo==="asig"&&x.categoria===n&&String(x.fecha).slice(0,10)>=addD(o.D,-6)&&String(x.fecha).slice(0,10)<=o.D).map(x=>num(x.monto))):0,carry=sum(movs.filter(x=>(x.tipo==="asig"||x.tipo==="gasto")&&x.categoria===n&&String(x.fecha).slice(0,7)<m).map(x=>x.tipo==="asig"?num(x.monto):-num(x.monto))),days=Math.max(0,diff(t,o.D)),wl=Math.max(1,Math.ceil((days+1)/7));
-  list.push({n,p,bud,asg,sp,carry,wf,bal:carry+asg-sp,falta:Math.max(0,bud-asg),sem:0,venc:false,...o,days,wl})};
+ const mk=(n,p,bud,o)=>{if(!(bud>0))return;const asg=sum(as.filter(x=>x.categoria===n).map(x=>num(x.monto)))+sum(movs.filter(x=>x.tipo==="ingreso"&&x.ds===n&&String(x.fecha).slice(0,7)===m).map(x=>num(x.monto))),spT=sum(gs.filter(x=>x.categoria===n&&x.tj).map(x=>num(x.monto))),sp=sum(gs.filter(x=>x.categoria===n).map(x=>num(x.monto))),wf=o.sem>0?sum(movs.filter(x=>((x.tipo==="asig"&&x.categoria===n)||(x.tipo==="ingreso"&&x.ds===n))&&String(x.fecha).slice(0,10)>=addD(o.D,-6)&&String(x.fecha).slice(0,10)<=o.D).map(x=>num(x.monto))):0,carry=sum(movs.filter(x=>String(x.fecha).slice(0,7)<m).map(x=>x.tipo==="asig"&&x.categoria===n?num(x.monto):x.tipo==="ingreso"&&x.ds===n?num(x.monto):x.tipo==="gasto"&&!x.tj&&x.categoria===n?-num(x.monto):0)),days=Math.max(0,diff(t,o.D)),wl=Math.max(1,Math.ceil((days+1)/7));
+  list.push({n,p,bud,asg,sp,carry,wf,bal:carry+asg-(sp-spT),falta:Math.max(0,bud-asg),sem:0,venc:false,...o,days,wl})};
  fijosOf(m).forEach(x=>{if(num(x.a)>0)mk(x.n,"fecha",num(x.a),{D:x.v?m+"-"+String(Math.min(+x.v,dim)).padStart(2,"0"):eom,venc:!!x.v})});
  cfg.catG.filter(x=>!x.f&&(num(x.b)>0||num(x.sem)>0)).forEach(x=>{let D=eom,sem=0;if(x.dia!==""&&x.dia!==undefined&&x.dia!==null&&num(x.sem)>0){const d=parseD(t);d.setDate(d.getDate()+(+x.dia-d.getDay()+7)%7);D=fmt(d);sem=num(x.sem);if(D===t&&gs.some(g=>g.categoria===x.n&&String(g.fecha).slice(0,10)===t)){const d2=parseD(t);d2.setDate(d2.getDate()+7);D=fmt(d2)}}
   mk(x.n,x.p||(["Comida","Transporte","Salud"].includes(x.n)?"vital":"gusto"),Math.max(num(x.b),sem*[...Array(dim)].filter((_,i)=>new Date(+m.slice(0,4),+m.slice(5,7)-1,i+1).getDay()===+x.dia).length),{D,sem})});
@@ -463,13 +489,13 @@ async function maybeSend(al){if(!cfg.wa||!CB.bot_url||!CB.mi_numero)return;const
  const txt="💰 Finanzas del hogar\n"+nw.map(a=>"• "+a.t).join("\n"),url=String(CB.bot_url).replace(/\{texto\}/g,encodeURIComponent(txt)).replace(/\{numero\}/g,digits(CB.mi_numero));
  try{await fetch(url,{mode:"no-cors"});cfg.sent={d:t,k:old.concat(nw.map(a=>a.k))};await saveCfg()}catch(e){}}
 function avisosHtml(){const A=avisos();return'<div class="card"><h2>Avisos</h2>'+(A.length?A.map(a=>'<div class="tip">'+(a.l==="bad"?"🔴":"🟡")+" "+esc(a.t)+'</div>').join(""):'<div class="sub">Todo en orden ✅</div>')+'</div>'}
-function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Efectivo sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.tarjetas.length?'<div class="sub">En tarjetas (aparte): '+moneyX(sum(cfg.tarjetas.map(x=>num(x.s))))+'</div>':"")+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
+function carteraHtml(){const S=sobresData();return avisosHtml()+'<div class="card"><h2>Cartera</h2><div class="v '+(S.cart>=S.piso?"ok":"bad")+'">'+money(S.cart)+'</div><div class="sub">Efectivo sin asignar '+money(S.sin)+' · piso '+money(S.piso)+'</div>'+(cfg.tarjetas.length?'<div class="sub">En tarjetas (aparte): '+moneyX(tjTot())+'</div>':"")+(cfg.cartDesde?"":'<div class="sub warn" style="margin-top:6px">Ve a Ajustes y escribe desde qué día cuentas y cuánto había en la cartera ese día.</div>')+'</div>'}
 const gastoCats=()=>fijosOf(today().slice(0,7)).map(x=>x.n).concat(cfg.catG.filter(x=>!x.f).map(x=>x.n));
-const tjRow=x=>'<div class="two2" data-id="'+esc(x.id||"")+'"><input class="tn" value="'+esc(x.n)+'" placeholder="Nombre (ej. Tarjeta personal)"><input class="ts" type="number" inputmode="decimal" placeholder="Saldo" value="'+(x.s===""||x.s===undefined?"":num(x.s))+'"><button class="chip" data-fx aria-label="Quitar">×</button></div>';
+const tjRow=x=>'<div class="two2" data-id="'+esc(x.id||"")+'"><input class="tn" value="'+esc(x.n)+'" placeholder="Nombre (ej. Tarjeta personal)"><input class="ts" type="number" inputmode="decimal" placeholder="Saldo" value="'+(x.s===""||x.s===undefined?"":(x.id?tjSaldo(x.id):num(x.s)))+'"><button class="chip" data-fx aria-label="Quitar">×</button></div>';
 function sobresHtml(){const S=sobresData(),R=S.ritmo,sd=d=>d.slice(8)+"/"+d.slice(5,7),pc=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0,tot=sum(S.ord.map(e=>e.give));let cum=0;
  const nb=S.repHecho?"Ya aplicaste el reparto de esta semana ("+sd(S.repFecha)+"). El próximo es el domingo. Si necesitas mover dinero antes, usa Movimientos → Transferencia.":(S.sin<=S.piso?"No hay botón de reparto porque no hay dinero libre sobre el piso: tienes "+money(S.sin)+" sin asignar y el piso es "+money(S.piso)+". ":"")+(!S.aps.length?"No hay nada por apartar este mes: el ahorro, las metas y las deudas salen de tus porcentajes de Ajustes sobre la ganancia del mes (más el dinero con el que empezaste este mes). Revisa que el porcentaje no sea 0. ":"")+(S.sin>S.piso&&S.c.ingreso>0?"No hay nada que repartir ahora. ":"")+"Para ahorrar ya, anota en Movimientos el tipo «Ahorro: meter dinero».";
  let h='<div class="card"><h2>Dinero sin asignar</h2><div class="v '+(S.sin<0?"bad":S.sin<S.piso?"warn":"ok")+'">'+money(S.sin)+'</div><div class="sub">Piso '+money(S.piso)+' · libre sobre el piso '+money(Math.max(0,S.sin-S.piso))+' · cartera total '+money(S.cart)+'</div></div>';
- h+='<div class="card"><h2>Tarjetas</h2><div class="sub">Efectivo (cartera): <b>'+money(S.cart)+'</b> · En tarjetas: <b>'+moneyX(sum(cfg.tarjetas.map(x=>num(x.s))))+'</b>. Se ven aparte: las tarjetas no se suman a la cartera ni al reparto. Escribe tú el nombre y el saldo.</div><div id="tj" style="margin-top:8px">'+cfg.tarjetas.map(tjRow).join("")+'</div><button class="chip" data-tjadd style="width:100%;margin-bottom:8px">+ Añadir tarjeta</button><button class="btn" data-tjsave="1">Guardar tarjetas</button></div>';
+ h+='<div class="card"><h2>Tarjetas</h2><div class="sub">Efectivo (cartera): <b>'+money(S.cart)+'</b> · En tarjetas: <b>'+moneyX(tjTot())+'</b>. Se ven aparte: las tarjetas no se suman a la cartera ni al reparto. Escribe el saldo actual: después se actualiza solo con los movimientos que hagas con cada tarjeta.</div><div id="tj" style="margin-top:8px">'+cfg.tarjetas.map(tjRow).join("")+'</div><button class="chip" data-tjadd style="width:100%;margin-bottom:8px">+ Añadir tarjeta</button><button class="btn" data-tjsave="1">Guardar tarjetas</button></div>';
  h+='<div class="card"><h2>Sobres</h2>'+(S.list.length?S.list.map(e=>'<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>'+esc(e.n)+' <span class="sub">'+({vital:"vital",fecha:"con fecha",gusto:"gusto"}[e.p]||"")+'</span></b><b class="'+(e.bal<0?"bad":"")+'">'+moneyX(e.bal)+'</b></div><div class="bar"><i style="width:'+pc(e.sp,e.bud)+'%;background:'+(e.sp>e.bud?"var(--bad)":"var(--save)")+'"></i></div><div class="sub">Gastado '+moneyX(e.sp)+' de '+money(e.bud)+' · falta llenar '+money(e.falta)+(e.carry>0?" · acumulado del mes anterior "+money(e.carry):"")+(e.need>0?" · necesita "+money(e.need)+" antes del "+sd(e.D):"")+(e.give>0&&!S.repHecho?" → reparto "+money(e.give):"")+'</div></div>').join(""):'<div class="sub">Crea tus sobres en Ajustes: gastos fijos y categorías con monto por mes.</div>')+
   (tot>0&&!S.repHecho?'<button class="btn" data-rep="1" style="margin-top:10px">'+(S.esDom?"Aplicar reparto de la semana":"Aplicar reparto de la semana (pendiente)")+' ('+money(tot)+')</button><div class="sub" style="margin-top:6px">El reparto nunca toca el piso: quedarían '+money(S.sin-tot)+' sin asignar.</div>':'<div class="sub" style="margin-top:10px">'+nb+'</div>')+'</div>';
  const SB=sobrante(S);if(SB.items.length)h+='<div class="card"><h2>Sobrante libre</h2><div class="sub">Dinero libre por encima del piso y de lo que falta del mes: '+money(SB.free)+'. Recomendación:</div>'+SB.items.map(x=>'<div class="row"><div><b>'+esc(x.n)+'</b><div class="sub">'+esc(x.why)+'</div></div><b class="save">'+money(x.amt)+'</b></div>').join("")+(SB.rest>=10?'<div class="sub" style="margin-top:6px">El resto ('+money(SB.rest)+') queda sin asignar como colchón para el mes siguiente.</div>':'')+(SB.adv.length?'<div class="sub" style="margin-top:6px">Por los precios que suben, considera adelantar: '+esc(SB.adv.join(", "))+'.</div>':'')+'<button class="btn" data-sob="1" style="margin-top:10px">Aplicar recomendación ('+money(SB.items.reduce((a,x)=>a+(x.k==="gusto"&&!x.cat?0:x.amt),0))+')</button></div>';
@@ -516,7 +542,7 @@ const HELP={
 "¿A dónde se va el dinero?":"Gráfica de círculo: cada color es una categoría de gastos y su tamaño es cuánto se gastó en ella.",
 "Ingresos y gastos por día":"Cada punto verde es lo que ganaste ese día y cada punto rojo lo que gastaste. Sirve para ver en qué días entra o sale más dinero.",
 "Reparto del mes":"Del dinero del mes, qué parte se fue en gastos, ahorro, metas, deudas y cuánto queda.",
-"Añadir movimiento":"Aquí anotas gastos, ingresos extra, ahorro y aportes a metas o deudas. Los gastos fijos págalos aquí con una categoría marcada «fijo».",
+"Añadir movimiento":"Con «Transferencia» mueves dinero entre efectivo, sobres y tarjetas. Un gasto puede pagarse con efectivo o con una tarjeta, y un ingreso puede entrar a Sin asignar, a un sobre o a una tarjeta. Aquí anotas gastos, ingresos extra, ahorro y aportes a metas o deudas. Los gastos fijos págalos aquí con una categoría marcada «fijo».",
 "Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido, con los montos exactos. Puedes editar o borrar lo que se anotó mal. Verde matcha = ingresos, rojo borgoña = gastos, azul mar = transferencias, azul = ahorro, metas y deudas.",
 "Metas":"Cosas que quieren comprar o lograr. El tiempo se calcula dividiendo lo que falta entre el aporte mensual que le asignaste.",
 "Nueva meta":"Pon el nombre, cuánto cuesta y cuánto le aportarás cada mes. Con eso la web calcula en qué mes la completan.",
@@ -526,7 +552,7 @@ const HELP={
 "Dinero realmente libre":"Lo que puedes gastar sin dañar nada: ganancia menos gastos hechos, fijos que faltan y lo que falta por apartar.",
 "Fondo de emergencia":"Ahorro para imprevistos. La meta son varios meses de gastos; la barra muestra cuánto llevan.",
 "¿Puedo comprar algo?":"Escribe el precio y dime si es necesario: te digo si conviene comprarlo ahora, esperar o dejarlo.",
-"Tarjetas":"Tus tarjetas del banco y su saldo, que tú escribes y actualizas a mano. Se ven aparte del efectivo y no se suman a la cartera ni al reparto. Nunca escribas aquí números de tarjeta ni claves: solo un nombre y el saldo.",
+"Tarjetas":"Tus tarjetas del banco. Escribes el saldo actual y después se actualiza solo con lo que hagas en Movimientos (ingresos, gastos con tarjeta y transferencias). Si lo cambias a mano, ese pasa a ser el saldo actual. Se ven aparte del efectivo y no se suman a la cartera ni al reparto. Nunca escribas aquí números de tarjeta ni claves: solo un nombre y el saldo.",
 "Dinero sin asignar":"Dinero que tienes pero aún no está dentro de ningún sobre. El piso es lo que siempre debe quedar aquí para compras que aparezcan.",
 "Sobres":"Cada gasto es un sobre con lo que tiene dentro, lo gastado y lo que falta llenar. «Necesita» es lo que debe tener antes de su fecha o día. Lo que no uses de un sobre se queda acumulado ahí como colchón extra: el mes siguiente igual se le asigna su monto completo, como si ese acumulado no existiera. Los sobres con día fijo y monto semanal reciben cada semana ese monto completo, sin descontar lo que sobró. El reparto se aplica una vez por semana (domingo), nunca baja del piso y ningún sobre se queda en cero: primero cada uno recibe una parte mínima (mayor si es más prioritario) y luego se completa por prioridad.",
 "Sobrante libre":"Dinero que sobra después de cubrir el piso y todo lo que falta del mes. Te propongo en qué usarlo, en este orden: fondo de emergencia, deudas, la meta más cercana y un pequeño premio. Lo que quede se queda sin asignar para el mes siguiente. Puedes aplicar la recomendación con el botón.",
@@ -572,7 +598,7 @@ document.addEventListener("click",async e=>{
    const c2=await sb.from("family_config").delete().eq("id",1);if(c2.error){$("rsm").textContent=c2.error.message;return false}
    movs=[];cfg=JSON.parse(CFG0);return true});return}
  if(b=t.closest("[data-tjadd]")){$("tj").insertAdjacentHTML("beforeend",tjRow({n:"",s:""}));$("tj").lastElementChild.querySelector(".tn").focus();return}
- if(b=t.closest("[data-tjsave]")){const arr=[...document.querySelectorAll("#tj .two2")].map((r,i)=>({id:r.dataset.id||"t"+Date.now()+i,n:r.querySelector(".tn").value.trim(),s:num(r.querySelector(".ts").value)})).filter(x=>x.n||x.s);
+ if(b=t.closest("[data-tjsave]")){const arr=[...document.querySelectorAll("#tj .two2")].map((r,i)=>({id:r.dataset.id||"t"+Date.now()+i,n:r.querySelector(".tn").value.trim(),s:num(r.querySelector(".ts").value)-(r.dataset.id?tjNet(r.dataset.id):0)})).filter(x=>x.n||x.s);
   saving(b,async()=>{cfg.tarjetas=arr;return await saveCfg()});return}
  if(b=t.closest("[data-sob]")){const S=sobresData(),SB=sobrante(S),f=today(),rows=[];
   SB.items.forEach(x=>{if(x.k==="ahorro")rows.push({tipo:"ahorro",fecha:f,categoria:null,descripcion:"sobrante",monto:x.amt});else if(x.k==="gusto"){if(x.cat)rows.push({tipo:"asig",fecha:f,categoria:x.cat,descripcion:"sobrante",monto:x.amt})}else rows.push({tipo:x.k,fecha:f,categoria:x.id,descripcion:"sobrante",monto:x.amt})});
@@ -590,6 +616,7 @@ document.addEventListener("click",async e=>{
  if(b=t.closest("[data-ed]")){const x=movs.find(m=>String(m.id)===b.dataset.ed);if(!x)return;EDIT=x.id;
   $("mt").value=x.tipo==="ahorro"&&num(x.monto)<0?"ahorro-":x.tipo;$("mt").onchange();
   if(["gasto","ingreso","meta","deuda"].includes(x.tipo))$("mc").value=x.categoria||"";
+  $("mpay").value=x.tipo==="gasto"?(x.tj||""):"";$("mdest").value=x.tipo==="ingreso"?(x.tj?"t:"+x.tj:x.ds?"s:"+x.ds:"sin"):"sin";
   $("mf").value=String(x.fecha).slice(0,10);$("md").value=x.descripcion||"";$("ma").value=Math.abs(num(x.monto));
   $("ms").textContent="Guardar cambios";$("mcancel").classList.remove("hidden");$("mmsg").textContent="Editando un movimiento: cambia lo que necesites y pulsa «Guardar cambios».";
   window.scrollTo({top:0,behavior:"smooth"});return}
