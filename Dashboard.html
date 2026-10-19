@@ -271,7 +271,31 @@ function pRes(c){
  chart("c3",{type:"pie",data:{labels:["Gastos","Ahorro","Metas","Deudas","Queda"],datasets:[{data:[c.gasto,c.aA,c.aM,c.aD,Math.max(0,c.bal)],backgroundColor:[CC("exp"),"#2563eb","#7c3aed","#d97706","#16a34a"],borderWidth:0}]},options:{maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10}}}}});
 }
 const opts=a=>a.map(x=>`<option value="${esc(x.id||x)}">${esc(x.n||x)}</option>`).join("");
-function pMov(c){EDIT=null;
+const isTr=x=>(x.tipo==="asig"||x.tipo==="tmov")&&x.descripcion==="transferencia";
+const trLab=v=>v==="sin"?"Sin asignar":v.indexOf("s:")===0?"Sobre: "+v.slice(2):"💳 "+tjName(v.slice(2));
+function trGroups(list){
+ const rows=list.filter(isTr).slice().sort((a,b)=>a.id-b.id),used=new Set(),G=[],fd=x=>String(x.fecha).slice(0,10);
+ for(let i=0;i<rows.length;i++){const a=rows[i];if(used.has(a.id))continue;const b=rows[i+1];
+  const pair=b&&!used.has(b.id)&&b.id===a.id+1&&b.tipo===a.tipo&&fd(a)===fd(b)&&num(a.monto)===-num(b.monto)&&((a.tipo==="asig"&&!a.tj&&!b.tj&&a.categoria!==b.categoria)||(a.tipo==="tmov"&&a.tj&&b.tj&&a.tj!==b.tj));
+  let from,to,ids=[a.id],am=Math.abs(num(a.monto));
+  if(pair){used.add(b.id);ids.push(b.id);
+   if(a.tipo==="asig"){const d=num(a.monto)>0?a:b,o=d===a?b:a;from="s:"+o.categoria;to="s:"+d.categoria}
+   else{const f=num(a.monto)>0?a:b,t=f===a?b:a;from="t:"+f.tj;to="t:"+t.tj}}
+  else if(a.tipo==="asig"&&!a.tj){if(num(a.monto)>0){from="sin";to="s:"+a.categoria}else{from="s:"+a.categoria;to="sin"}}
+  else if(a.tipo==="asig"){if(num(a.monto)<0){from="s:"+a.categoria;to="t:"+a.tj}else{from="t:"+a.tj;to="s:"+a.categoria}}
+  else{if(num(a.monto)<0){from="sin";to="t:"+a.tj}else{from="t:"+a.tj;to="sin"}}
+  G.push({ids,fecha:fd(a),a:am,from,to})}
+ return G}
+function mvList(mm){
+ const G=trGroups(mm),inG=new Set(G.reduce((r,g)=>r.concat(g.ids),[])),E=[],dm=f=>f.slice(8,10)+"/"+f.slice(5,7);
+ mm.forEach(x=>{if(!inG.has(x.id))E.push({f:String(x.fecha).slice(0,10),id:x.id,x})});
+ G.forEach(g=>E.push({f:g.fecha,id:g.ids[0],g}));
+ E.sort((a,b)=>b.f.localeCompare(a.f)||(b.id-a.id));
+ return E.map(e=>{
+  if(e.g){const g=e.g,k=g.ids.join(",");return'<div class="row mv mv-trf"><div><b>Transferencia</b><div class="sub">'+dm(e.f)+' · '+esc(trLab(g.from))+' → '+esc(trLab(g.to))+'</div></div><div style="text-align:right"><b>'+moneyX(g.a)+'</b><br><button class="chip" data-edt="'+k+'" style="padding:1px 8px">Editar</button> <button class="chip" data-del="'+k+'" style="padding:1px 8px">Borrar</button></div></div>'}
+  const x=e.x,cl=x.tipo==="ingreso"?"inc":x.tipo==="gasto"?"exp":x.tipo==="asig"||x.tipo==="tmov"?"trf":"sav";
+  return'<div class="row mv mv-'+cl+'"><div><b>'+esc(x.descripcion||x.categoria||x.tipo)+'</b><div class="sub">'+dm(e.f)+' · '+mvSub(x)+'</div></div><div style="text-align:right"><b>'+moneyX(x.monto)+'</b><br>'+(x.tipo!=="asig"&&x.tipo!=="tmov"?'<button class="chip" data-ed="'+x.id+'" style="padding:1px 8px">Editar</button> ':'')+'<button class="chip" data-del="'+x.id+'" style="padding:1px 8px">Borrar</button></div></div>'}).join("")}
+function pMov(c){EDIT=null;EDITTR=null;
  $("p-mov").innerHTML=`<div class="card"><h2>Añadir movimiento</h2>
  <div class="f"><label>Tipo</label><select id="mt"><option value="gasto">Gasto</option><option value="ingreso">Ingreso extra</option><option value="ahorro">Ahorro: meter dinero</option><option value="ahorro-">Ahorro: sacar dinero</option><option value="meta">Aporte a una meta</option><option value="deuda">Pago de una deuda</option><option value="mover">Transferencia</option></select></div>
  <div class="f"><label id="mcl">Categoría</label><select id="mc">${opts(gastoCats())}</select></div>
@@ -279,8 +303,7 @@ function pMov(c){EDIT=null;
  <div class="f"><label>Descripción</label><input id="md" placeholder="Ej. Supermercado"></div>
  <div class="f"><label>Monto</label><input id="ma" type="number" inputmode="decimal"></div>
  <button class="btn" id="ms">Guardar</button><button class="chip hidden" id="mcancel" style="width:100%;margin-top:8px">Cancelar edición</button><p id="mmsg" class="bad"></p></div>
- <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?c.mm.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.id-a.id)).map(x=>`<div class="row mv mv-${x.tipo==="ingreso"?"inc":x.tipo==="gasto"?"exp":x.tipo==="asig"||x.tipo==="tmov"?"trf":"sav"}"><div><b>${esc(x.descripcion||x.categoria||x.tipo)}</b><div class="sub">${esc(String(x.fecha).slice(8)+"/"+String(x.fecha).slice(5,7))} · ${mvSub(x)}</div></div>
- <div style="text-align:right"><b>${moneyX(x.monto)}</b><br>${x.tipo!=="asig"&&x.tipo!=="tmov"?`<button class="chip" data-ed="${x.id}" style="padding:1px 8px">Editar</button> `:""}<button class="chip" data-del="${x.id}" style="padding:1px 8px">Borrar</button></div></div>`).join(""):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
+ <div class="card"><h2>Movimientos del mes</h2><div id="movl">${c.mm.length?mvList(c.mm):'<p class="sub">Aún no hay movimientos.</p>'}</div></div>`;
  fitMov();
  const sel=()=>{const t=$("mt").value;$("mcl").textContent=t==="gasto"?"Categoría / sobre":t==="ingreso"?"Categoría del ingreso":t==="meta"?"¿Qué meta?":t==="deuda"?"¿Qué deuda?":t==="mover"?"Transferir a":"—";
   $("mc").parentNode.classList.toggle("hidden",!["gasto","ingreso","meta","deuda","mover"].includes(t));$("mxw").classList.toggle("hidden",t!=="mover");
@@ -316,7 +339,9 @@ function pMov(c){EDIT=null;
      if(!confirm("El sobre «"+cat+"» tiene "+money(Math.max(0,e.bal))+" y la compra es de "+money(a)+".\nEl asesor propone tomar: "+(T.steps.map(x=>money(x.amt)+" de "+x.from).join(", ")||"no hay de dónde")+(T.short>0?"\nOjo: aún faltarían "+money(T.short)+" (el sobre quedará en rojo).":"")+"\n¿Aceptas?"))return;
      T.steps.forEach(x=>{rows.push({tipo:"asig",fecha:f,categoria:cat,descripcion:"desde "+x.from,monto:x.amt});if(!x.sin)rows.push({tipo:"asig",fecha:f,categoria:x.from,descripcion:"hacia "+cat,monto:-x.amt})})}}
    rows.push(one())}
-  saving(bt,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}await load();return true})};
+  saving(bt,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){$("mmsg").textContent="No se pudo guardar: "+error.message;return false}
+   if(EDITTR){const d=await sb.from("family_movs").delete().in("id",EDITTR);if(d.error){$("mmsg").textContent="Se guardó la nueva, pero no pude borrar la anterior: "+d.error.message;await load();return false}EDITTR=null}
+   await load();return true})};
 }
 const saveCfg=async()=>{const{error}=await sb.from("family_config").upsert({id:1,valores:cfg});if(error)alert("No se pudo guardar: "+error.message);return!error};
 function eta(falta,a){if(falta<=0)return"¡Lograda! 🎉";if(!(a>0))return"Pon un aporte mensual para calcular";const n=Math.ceil(falta/a),d=new Date();d.setMonth(d.getMonth()+n);return"~"+n+" mes(es) · "+d.toLocaleDateString("es",{month:"long",year:"numeric"})}
@@ -543,7 +568,7 @@ const HELP={
 "Ingresos y gastos por día":"Cada punto verde es lo que ganaste ese día y cada punto rojo lo que gastaste. Sirve para ver en qué días entra o sale más dinero.",
 "Reparto del mes":"Del dinero del mes, qué parte se fue en gastos, ahorro, metas, deudas y cuánto queda.",
 "Añadir movimiento":"Con «Transferencia» mueves dinero entre efectivo, sobres y tarjetas. Un gasto puede pagarse con efectivo o con una tarjeta, y un ingreso puede entrar a Sin asignar, a un sobre o a una tarjeta. Aquí anotas gastos, ingresos extra, ahorro y aportes a metas o deudas. Los gastos fijos págalos aquí con una categoría marcada «fijo».",
-"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido, con los montos exactos. Puedes editar o borrar lo que se anotó mal. Verde matcha = ingresos, rojo borgoña = gastos, azul mar = transferencias, azul = ahorro, metas y deudas.",
+"Movimientos del mes":"Lista de todo lo que se anotó en el mes elegido, con los montos exactos. Puedes editar o borrar lo que se anotó mal; cada transferencia sale como una sola línea. Verde matcha = ingresos, rojo borgoña = gastos, azul mar = transferencias, azul = ahorro, metas y deudas.",
 "Metas":"Cosas que quieren comprar o lograr. El tiempo se calcula dividiendo lo que falta entre el aporte mensual que le asignaste.",
 "Nueva meta":"Pon el nombre, cuánto cuesta y cuánto le aportarás cada mes. Con eso la web calcula en qué mes la completan.",
 "Deudas":"Lo que deben. La web calcula cuándo terminan según la cuota mensual. El % de deudas solo se aparta si hay alguna anotada.",
@@ -582,7 +607,7 @@ async function saving(btn,fn){const old=btn.textContent;btn.disabled=true;btn.cl
  let ok=false;try{ok=await fn()}catch(e){alert(e.message||e)}
  btn.classList.remove("busy");btn.textContent=ok?"¡Guardado ✓!":"No se guardó";if(ok)btn.classList.add("done");live(ok?"ok":"bad",ok?"Guardado ✓":"Error al guardar");
  setTimeout(()=>{btn.textContent=old;btn.classList.remove("done");btn.disabled=false;live("idle");if(ok)render()},1200)}
-let EDIT=null;
+let EDIT=null,EDITTR=null;
 let lastAct=Date.now();["click","input","touchstart","keydown","scroll"].forEach(ev=>document.addEventListener(ev,()=>{lastAct=Date.now()},{passive:true,capture:true}));
 const busyUI=()=>Date.now()-lastAct<120000||!!document.querySelector(".help:not(.hidden)")||!!($("pv")&&$("pv").innerHTML.trim())||document.activeElement.matches("input,select,textarea");
 async function refresh(){if(document.hidden||$("app").classList.contains("hidden")||liveKind==="save")return;await load();if(["res","pla","ase"].includes(tab)&&!busyUI())render()}
@@ -613,6 +638,10 @@ document.addEventListener("click",async e=>{
   if(S.repHecho){alert("Ya aplicaste el reparto de esta semana.");return}
   if(S.sin-sum(rows.map(r=>num(r.monto)))<S.piso-1){alert("Este reparto dejaría el dinero sin asignar por debajo del piso. No se aplicó.");return}
   saving(b,async()=>{const{error}=await sb.from("family_movs").insert(rows);if(error){alert(error.message);return false}await load();return true});return}
+ if(b=t.closest("[data-edt]")){const ids=b.dataset.edt.split(",").map(Number),g=trGroups(movs.filter(m=>ids.includes(Number(m.id))))[0];if(!g)return;
+  EDIT=null;EDITTR=ids;$("mt").value="mover";$("mt").onchange();$("mx").value=g.from;$("mc").value=g.to;$("mf").value=g.fecha;$("md").value="";$("ma").value=g.a;
+  $("ms").textContent="Guardar cambios";$("mcancel").classList.remove("hidden");$("mmsg").textContent="Editando una transferencia: cambia lo que necesites y pulsa «Guardar cambios».";
+  window.scrollTo({top:0,behavior:"smooth"});return}
  if(b=t.closest("[data-ed]")){const x=movs.find(m=>String(m.id)===b.dataset.ed);if(!x)return;EDIT=x.id;
   $("mt").value=x.tipo==="ahorro"&&num(x.monto)<0?"ahorro-":x.tipo;$("mt").onchange();
   if(["gasto","ingreso","meta","deuda"].includes(x.tipo))$("mc").value=x.categoria||"";
@@ -622,7 +651,7 @@ document.addEventListener("click",async e=>{
   window.scrollTo({top:0,behavior:"smooth"});return}
  if(b=t.closest("[data-help]")){b.parentNode.nextElementSibling.classList.toggle("hidden");return}
  if(b=t.closest("[data-cadd]")){const g=b.dataset.cadd==="g";$(g?"cg":"ci").insertAdjacentHTML("beforeend",crow("",0,g));const L=$(g?"cg":"ci").lastElementChild;if(g){L.querySelector(".cdet").classList.remove("hidden");L.querySelector("[data-gear]").classList.add("on")}L.querySelector(".cn").focus();return}
- if(b=t.closest("[data-del]")){if(!confirm("¿Borrar este movimiento?"))return;await sb.from("family_movs").delete().eq("id",b.dataset.del);await load();render();return}
+ if(b=t.closest("[data-del]")){if(!confirm("¿Borrar este movimiento?"))return;await sb.from("family_movs").delete().in("id",b.dataset.del.split(","));await load();render();return}
  if(b=t.closest("[data-gear]")){b.classList.toggle("on");b.closest(".crow").querySelector(".cdet").classList.toggle("hidden");return}
  if(b=t.closest("[data-mv]")){const r=b.closest(".crow"),d=+b.dataset.mv;if(d<0&&r.previousElementSibling)r.parentNode.insertBefore(r,r.previousElementSibling);if(d>0&&r.nextElementSibling)r.parentNode.insertBefore(r.nextElementSibling,r);r.scrollIntoView({block:"nearest"});return}
  if(b=t.closest("[data-fx]")){b.closest(".crow,.two,.two2").remove();return}
